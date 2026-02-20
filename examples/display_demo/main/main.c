@@ -173,10 +173,10 @@ static void sensor_timer_cb(lv_timer_t *t)
         int t10 = (int)(temp * 10.0f + (temp >= 0.0f ? 0.5f : -0.5f));
         int h10 = (int)(hum  * 10.0f + 0.5f);
         lv_label_set_text_fmt(s_temp_label,
-                              LV_SYMBOL_CHARGE "  %d.%d" "\xc2\xb0" "C",
+                              "%d.%d" "\xc2\xb0" "C",
                               t10 / 10, abs(t10 % 10));
         lv_label_set_text_fmt(s_hum_label,
-                              LV_SYMBOL_REFRESH "  %d.%d %%RH",
+                              "%d.%d %%RH",
                               h10 / 10, h10 % 10);
     } else {
         lv_label_set_text(s_temp_label, LV_SYMBOL_WARNING "  Read error");
@@ -284,12 +284,12 @@ static void ui_create(void)
         lv_obj_set_style_text_color(sen_title, COL_MUTED, 0);
 
         s_temp_label = lv_label_create(tab_sen);
-        lv_label_set_text(s_temp_label, LV_SYMBOL_CHARGE "  ---.-" "\xc2\xb0" "C");
+        lv_label_set_text(s_temp_label, "---.-" "\xc2\xb0" "C");
         lv_obj_set_style_text_font(s_temp_label, &lv_font_montserrat_48, 0);
         lv_obj_set_style_text_color(s_temp_label, COL_ACCENT, 0);
 
         s_hum_label = lv_label_create(tab_sen);
-        lv_label_set_text(s_hum_label, LV_SYMBOL_REFRESH "  ---.-%RH");
+        lv_label_set_text(s_hum_label, "---.-%RH");
         lv_obj_set_style_text_font(s_hum_label, &lv_font_montserrat_48, 0);
         lv_obj_set_style_text_color(s_hum_label, COL_CYAN, 0);
 

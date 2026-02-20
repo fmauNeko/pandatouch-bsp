@@ -1,0 +1,5 @@
+dependencies:
+  pandatouch:
+    path: "../../../pandatouch"
+  espressif/aht30:
+    version: "^1.0.0"

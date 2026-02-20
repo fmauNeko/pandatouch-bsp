@@ -1,7 +1,7 @@
 name: Build examples
 
-# Compiles both BSP examples on every change to BSP sources, examples, or CI scripts.
-# Order matters: display_hello must build before bsp_noglib.py renames pandatouch/ → pandatouch_noglib/.
+# Compiles all BSP examples on every change to BSP sources, examples, or CI scripts.
+# Order matters: display_hello and display_demo must build before bsp_noglib.py renames pandatouch/ → pandatouch_noglib/.
 
 on:
   push:
@@ -47,13 +47,21 @@ jobs:
           cd examples/display_hello
           idf.py build
 
-      # ── 2. Generate pandatouch_noglib (renames pandatouch/ → pandatouch_noglib/) ──
+      # ── 2. Build the comprehensive demo example (pandatouch/ must still exist) ──
+      - name: Build display_demo
+        shell: bash
+        run: |
+          . ${IDF_PATH}/export.sh
+          cd examples/display_demo
+          idf.py build
+
+      # ── 3. Generate pandatouch_noglib (renames pandatouch/ → pandatouch_noglib/) ──
       - name: Generate pandatouch_noglib
         shell: bash
         working-directory: ${{ github.workspace }}
         run: python .github/ci/bsp_noglib.py pandatouch
 
-      # ── 3. Build the no-LVGL example (pandatouch_noglib/ now exists) ───────
+      # ── 4. Build the no-LVGL example (pandatouch_noglib/ now exists) ───────
       - name: Build display_noglib
         shell: bash
         run: |

@@ -1,0 +1,3 @@
+dependencies:
+  pandatouch:
+    path: "../../pandatouch"

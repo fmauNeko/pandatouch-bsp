@@ -1,0 +1,3 @@
+dependencies:
+  pandatouch_noglib:
+    path: "../../pandatouch_noglib"

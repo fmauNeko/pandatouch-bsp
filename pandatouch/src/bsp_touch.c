@@ -55,6 +55,7 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config,
 
     esp_lcd_panel_io_handle_t tp_io_handle = NULL;
     esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
+    tp_io_config.scl_speed_hz = CONFIG_BSP_I2C_CLK_SPEED_HZ;
     BSP_ERROR_CHECK_RETURN_ERR(esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle));
 
     esp_lcd_touch_config_t tp_cfg = {

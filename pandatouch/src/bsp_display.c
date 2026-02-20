@@ -111,8 +111,10 @@ esp_err_t bsp_display_new(const bsp_display_config_t *config,
             .vsync_front_porch = 16,
             .flags.pclk_active_neg = true,
         },
-        .data_width        = 16,
-        .num_fbs           = 1,
+        .data_width             = 16,
+        .in_color_format        = LCD_COLOR_FMT_RGB565,
+        .num_fbs                = 2,  /* double-buffer required for avoid_tearing */
+        .bounce_buffer_size_px  = BSP_LCD_H_RES * CONFIG_BSP_LCD_RGB_BOUNCE_BUF_HEIGHT,
         .hsync_gpio_num    = GPIO_NUM_NC,
         .vsync_gpio_num    = GPIO_NUM_NC,
         .de_gpio_num       = BSP_LCD_DE,
@@ -158,7 +160,7 @@ lv_display_t *bsp_display_start(void)
         .double_buffer = CONFIG_BSP_LCD_DRAW_BUF_DOUBLE,
         .flags = {
             .buff_dma    = false,
-            .buff_spiram = true,
+            .buff_spiram = false,
         },
     };
 
@@ -198,13 +200,13 @@ lv_display_t *bsp_display_start_with_config(const bsp_display_cfg_t *cfg)
             .swap_bytes   = (BSP_LCD_BIGENDIAN ? true : false),
 #endif
             .full_refresh = false,
-            .direct_mode  = false,
+            .direct_mode  = true,
         },
     };
     const lvgl_port_display_rgb_cfg_t rgb_cfg = {
         .flags = {
-            .bb_mode      = false,
-            .avoid_tearing = false,
+            .bb_mode       = true,
+            .avoid_tearing = true,
         },
     };
 

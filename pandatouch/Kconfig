@@ -46,6 +46,18 @@ menu "Board Support Package (Panda Touch)"
             default n
             help
                 Whether to enable double framebuf for LVGL rendering.
+
+        config BSP_LCD_RGB_BOUNCE_BUF_HEIGHT
+            int "RGB bounce buffer height in lines"
+            default 10
+            range 2 100
+            help
+                Number of scanlines in the internal DRAM bounce buffer used by the
+                RGB panel DMA. The DMA reads from PSRAM into this small SRAM ring
+                and feeds the LCD pixel clock directly, decoupling PSRAM latency
+                from pixel timing. Larger values reduce interrupt frequency at the
+                cost of more internal SRAM. 10 lines (16 KB for 800-wide RGB565)
+                is a good default.
     endmenu
 
 endmenu

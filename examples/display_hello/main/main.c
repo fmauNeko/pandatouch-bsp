@@ -1,4 +1,5 @@
 #include "bsp/esp-bsp.h"
+#include "esp_log.h"
 
 static void on_usb_mount(void) { ESP_LOGI("app", "USB mounted"); }
 

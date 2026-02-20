@@ -79,6 +79,9 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config,
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
 #include "esp_lvgl_port.h"
 
+/* Forward declaration — implemented in bsp_display.c */
+void bsp_display_set_touch_indev(lv_indev_t *indev);
+
 esp_err_t bsp_display_indev_init(lv_display_t *disp)
 {
     esp_lcd_touch_handle_t tp = NULL;

@@ -13,3 +13,6 @@ CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 # RGB LCD needs wide data cache
 CONFIG_ESP32S3_DATA_CACHE_64KB=y
 CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+
+# LVGL: use Kconfig values, no lv_conf.h needed
+CONFIG_LV_CONF_SKIP=y

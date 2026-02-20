@@ -1,0 +1,55 @@
+# pandatouch BSP
+
+Board Support Package for the [BigTreeTech Panda Touch](https://bttwiki.com/PandaTouch.html) — an ESP32-S3 device with an 800×480 RGB LCD, GT911 capacitive touch, and USB-A OTG host.
+
+## Features
+
+- 800×480 RGB565 LCD (DE mode, 23 MHz PCLK)
+- GT911 capacitive touch controller (I2C0)
+- LEDC PWM backlight control
+- USB-A OTG MSC host with VFS mount at `/usb`
+- LVGL integration via [esp_lvgl_port](https://components.espressif.com/components/espressif/esp_lvgl_port)
+- No-LVGL variant (`pandatouch_noglib`) for raw panel access
+
+## Hardware
+
+| Interface | GPIO |
+|-----------|------|
+| PCLK | 5 |
+| DE | 38 |
+| LCD RST | 46 |
+| Backlight | 21 |
+| Touch SCL | 1 |
+| Touch SDA | 2 |
+| Touch RST | 41 |
+| Touch INT | 40 |
+| USB D+ | 20 |
+| USB D- | 19 |
+
+## Usage
+
+```c
+#include "bsp/esp-bsp.h"
+
+void app_main(void)
+{
+    lv_display_t *disp = bsp_display_start();
+    bsp_display_brightness_set(80);
+    // ... create LVGL widgets
+}
+```
+
+## No-LVGL Variant
+
+Use `pandatouch_noglib` for raw panel access without LVGL. The noglib component is not stored in this repository — it is generated at CI time using `bsp_noglib.py`.
+
+To build locally:
+```bash
+pip install idf-component-manager==2.* py-markdown-table
+python .github/ci/bsp_noglib.py pandatouch
+cd examples/display_noglib && idf.py build
+```
+
+## License
+
+Apache-2.0

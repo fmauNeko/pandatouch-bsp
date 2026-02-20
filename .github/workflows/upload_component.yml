@@ -1,0 +1,21 @@
+name: Push pandatouch to Espressif Component Service
+
+on:
+  push:
+    branches: [master]
+    paths: ['pandatouch/**', '.github/**']
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths: ['pandatouch/**', '.github/**']
+
+jobs:
+  upload_component:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: espressif/upload-components-ci-action@v2
+        with:
+          components: pandatouch
+          namespace: "<org>"
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
+          dry_run: ${{ github.ref_name != 'master' || github.repository_owner != '<org>' }}

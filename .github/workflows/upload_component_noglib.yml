@@ -1,0 +1,26 @@
+name: Push pandatouch_noglib to Espressif Component Service
+
+on:
+  push:
+    branches: [master]
+    paths: ['pandatouch/**', '.github/**']
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths: ['pandatouch/**', '.github/**']
+
+jobs:
+  upload_noglib:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate pandatouch_noglib
+        run: |
+          pip install idf-component-manager==2.* py-markdown-table --upgrade
+          python .github/ci/bsp_noglib.py pandatouch
+      - uses: espressif/upload-components-ci-action@v2
+        with:
+          components: pandatouch_noglib
+          namespace: "<org>"
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
+          dry_run: ${{ github.ref_name != 'master' || github.repository_owner != '<org>' }}
+          commit_sha: ''

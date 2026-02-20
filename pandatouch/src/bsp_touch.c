@@ -58,6 +58,10 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config,
     tp_io_config.scl_speed_hz = CONFIG_BSP_I2C_CLK_SPEED_HZ;
     BSP_ERROR_CHECK_RETURN_ERR(esp_lcd_new_panel_io_i2c(i2c_handle, &tp_io_config, &tp_io_handle));
 
+    esp_lcd_touch_io_gt911_config_t tp_gt911_config = {
+        .dev_addr = tp_io_config.dev_addr,
+    };
+
     esp_lcd_touch_config_t tp_cfg = {
         .x_max = BSP_LCD_H_RES,
         .y_max = BSP_LCD_V_RES,
@@ -72,6 +76,7 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config,
             .mirror_x = 0,
             .mirror_y = 0,
         },
+        .driver_data = &tp_gt911_config,
     };
     BSP_ERROR_CHECK_RETURN_ERR(esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch));
     return ESP_OK;

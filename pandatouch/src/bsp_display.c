@@ -13,6 +13,9 @@
 #include "bsp/pandatouch.h"
 #include "bsp/display.h"
 #include "bsp_err_check.h"
+#if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
+#include "esp_lvgl_port.h"
+#endif // BSP_CONFIG_NO_GRAPHIC_LIB == 0
 
 static const char *TAG = "pandatouch";
 
@@ -140,41 +143,106 @@ esp_err_t bsp_display_new(const bsp_display_config_t *config,
 }
 
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
+static esp_lcd_panel_handle_t s_panel_handle = NULL;
+static lv_display_t          *s_display      = NULL;
+static lv_indev_t            *s_touch_indev  = NULL;
+
 lv_display_t *bsp_display_start(void)
 {
-    return NULL;
+    bsp_display_cfg_t cfg = {
+        .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
+        .buffer_size   = BSP_LCD_H_RES * CONFIG_BSP_LCD_DRAW_BUF_HEIGHT,
+        .double_buffer = CONFIG_BSP_LCD_DRAW_BUF_DOUBLE,
+        .flags = {
+            .buff_dma    = false,
+            .buff_spiram = true,
+        },
+    };
+
+    return bsp_display_start_with_config(&cfg);
 }
 
 lv_display_t *bsp_display_start_with_config(const bsp_display_cfg_t *cfg)
 {
-    return NULL;
+    BSP_NULL_CHECK(cfg, NULL);
+
+    BSP_ERROR_CHECK_RETURN_NULL(lvgl_port_init(&cfg->lvgl_port_cfg));
+
+    BSP_ERROR_CHECK_RETURN_NULL(bsp_display_new(NULL, &s_panel_handle, NULL));
+
+    const lvgl_port_display_cfg_t disp_cfg = {
+        .io_handle      = NULL,
+        .panel_handle   = s_panel_handle,
+        .control_handle = NULL,
+        .buffer_size    = cfg->buffer_size,
+        .double_buffer  = cfg->double_buffer,
+        .hres           = BSP_LCD_H_RES,
+        .vres           = BSP_LCD_V_RES,
+        .monochrome     = false,
+        .rotation       = {
+            .swap_xy  = false,
+            .mirror_x = false,
+            .mirror_y = false,
+        },
+#if LVGL_VERSION_MAJOR >= 9
+        .color_format = LV_COLOR_FORMAT_RGB565,
+#endif
+        .flags = {
+            .buff_dma     = cfg->flags.buff_dma,
+            .buff_spiram  = cfg->flags.buff_spiram,
+            .sw_rotate    = false,
+#if LVGL_VERSION_MAJOR >= 9
+            .swap_bytes   = (BSP_LCD_BIGENDIAN ? true : false),
+#endif
+            .full_refresh = false,
+            .direct_mode  = false,
+        },
+    };
+    const lvgl_port_display_rgb_cfg_t rgb_cfg = {
+        .flags = {
+            .bb_mode      = false,
+            .avoid_tearing = false,
+        },
+    };
+
+    s_display = lvgl_port_add_disp_rgb(&disp_cfg, &rgb_cfg);
+
+    return s_display;
 }
 
 lv_indev_t *bsp_display_get_input_dev(void)
 {
-    return NULL;
+    return s_touch_indev;
 }
 
 bool bsp_display_lock(uint32_t timeout_ms)
 {
-    return true;
+    return lvgl_port_lock(timeout_ms);
 }
 
 void bsp_display_unlock(void)
 {
+    lvgl_port_unlock();
 }
 
 void bsp_display_rotate(lv_display_t *disp, lv_disp_rotation_t rotation)
 {
+    lv_disp_set_rotation(disp, rotation);
 }
 
 esp_err_t bsp_display_enter_sleep(void)
 {
+    BSP_ERROR_CHECK_RETURN_ERR(esp_lcd_panel_disp_on_off(s_panel_handle, false));
+    BSP_ERROR_CHECK_RETURN_ERR(bsp_display_backlight_off());
+
     return ESP_OK;
 }
 
 esp_err_t bsp_display_exit_sleep(void)
 {
+    BSP_ERROR_CHECK_RETURN_ERR(esp_lcd_panel_disp_on_off(s_panel_handle, true));
+    BSP_ERROR_CHECK_RETURN_ERR(bsp_display_backlight_on());
+
     return ESP_OK;
 }
 #endif // BSP_CONFIG_NO_GRAPHIC_LIB == 0

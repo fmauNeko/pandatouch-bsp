@@ -75,3 +75,25 @@ esp_err_t bsp_touch_new(const bsp_touch_config_t *config,
     BSP_ERROR_CHECK_RETURN_ERR(esp_lcd_touch_new_i2c_gt911(tp_io_handle, &tp_cfg, ret_touch));
     return ESP_OK;
 }
+
+#if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
+#include "esp_lvgl_port.h"
+
+esp_err_t bsp_display_indev_init(lv_display_t *disp)
+{
+    esp_lcd_touch_handle_t tp = NULL;
+    const bsp_touch_config_t tp_cfg = { .dummy = NULL };
+    BSP_ERROR_CHECK_RETURN_ERR(bsp_touch_new(&tp_cfg, &tp));
+
+    const lvgl_port_touch_cfg_t touch_cfg = {
+        .disp    = disp,
+        .handle  = tp,
+    };
+    lv_indev_t *indev = lvgl_port_add_touch(&touch_cfg);
+    BSP_NULL_CHECK(indev, ESP_FAIL);
+
+    /* Store in bsp_display.c's s_touch_indev via the setter */
+    bsp_display_set_touch_indev(indev);
+    return ESP_OK;
+}
+#endif // BSP_CONFIG_NO_GRAPHIC_LIB == 0

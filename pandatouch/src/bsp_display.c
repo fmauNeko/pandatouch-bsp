@@ -15,6 +15,10 @@
 #include "bsp_err_check.h"
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
 #include "esp_lvgl_port.h"
+
+/* Forward declarations — implemented in bsp_touch.c */
+esp_err_t bsp_display_indev_init(lv_display_t *disp);
+void bsp_display_set_touch_indev(lv_indev_t *indev);
 #endif // BSP_CONFIG_NO_GRAPHIC_LIB == 0
 
 static const char *TAG = "pandatouch";
@@ -207,12 +211,22 @@ lv_display_t *bsp_display_start_with_config(const bsp_display_cfg_t *cfg)
 
     s_display = lvgl_port_add_disp_rgb(&disp_cfg, &rgb_cfg);
 
+    /* Initialize touch input device */
+    if (bsp_display_indev_init(s_display) != ESP_OK) {
+        ESP_LOGW(TAG, "Touch indev init failed — continuing without touch");
+    }
+
     return s_display;
 }
 
 lv_indev_t *bsp_display_get_input_dev(void)
 {
     return s_touch_indev;
+}
+
+void bsp_display_set_touch_indev(lv_indev_t *indev)
+{
+    s_touch_indev = indev;
 }
 
 bool bsp_display_lock(uint32_t timeout_ms)

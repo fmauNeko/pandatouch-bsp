@@ -16,6 +16,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
 
@@ -168,8 +169,15 @@ static void sensor_timer_cb(lv_timer_t *t)
     (void)t;
     float temp = 0.0f, hum = 0.0f;
     if (aht30_get_temperature_humidity_value(s_aht30, &temp, &hum) == ESP_OK) {
-        lv_label_set_text_fmt(s_temp_label, LV_SYMBOL_CHARGE "  %.1f " "\xc2\xb0" "C",  temp);
-        lv_label_set_text_fmt(s_hum_label,  LV_SYMBOL_REFRESH " %.1f %%RH", hum);
+        /* lv_snprintf has LV_SPRINTF_USE_FLOAT=0 by default — use integer math */
+        int t10 = (int)(temp * 10.0f + (temp >= 0.0f ? 0.5f : -0.5f));
+        int h10 = (int)(hum  * 10.0f + 0.5f);
+        lv_label_set_text_fmt(s_temp_label,
+                              LV_SYMBOL_CHARGE "  %d.%d" "\xc2\xb0" "C",
+                              t10 / 10, abs(t10 % 10));
+        lv_label_set_text_fmt(s_hum_label,
+                              LV_SYMBOL_REFRESH "  %d.%d %%RH",
+                              h10 / 10, h10 % 10);
     } else {
         lv_label_set_text(s_temp_label, LV_SYMBOL_WARNING "  Read error");
         lv_label_set_text(s_hum_label,  "");
@@ -271,7 +279,7 @@ static void ui_create(void)
 
     if (s_sensor_ok) {
         lv_obj_t *sen_title = lv_label_create(tab_sen);
-        lv_label_set_text(sen_title, "Panda Sense  \xe2\x80\x94  AHT30");
+        lv_label_set_text(sen_title, "Panda Sense  -  AHT30");
         lv_obj_set_style_text_font(sen_title, &lv_font_montserrat_18, 0);
         lv_obj_set_style_text_color(sen_title, COL_MUTED, 0);
 

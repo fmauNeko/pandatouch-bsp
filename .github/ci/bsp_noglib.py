@@ -7,6 +7,8 @@
 Remove esp_lvgl_port from BSP's dependencies
 """
 
+import os
+import shutil
 import sys
 import argparse
 from pathlib import Path
@@ -100,8 +102,15 @@ def bsp_no_glib_all(bsp_names):
             print("[Error] Argument {} does not point to existing BSP".format(bsp))
             raise Exception
 
-        # 1. Rename the BSP to BSP_noglib
-        bsp_path = bsp_path.rename(bsp + "_noglib")
+        # 1. Move/copy the BSP to BSP_noglib
+        noglib_path = Path(bsp + "_noglib")
+        if os.environ.get("CI"):
+            bsp_path = bsp_path.rename(noglib_path)
+        else:
+            if noglib_path.exists():
+                shutil.rmtree(noglib_path)
+            shutil.copytree(bsp_path, noglib_path)
+            bsp_path = noglib_path
 
         # 2. Modify the configuration, dependencies and README
         ret += select_bsp_config_no_graphic_lib(bsp_path)

@@ -17,6 +17,7 @@
 
 #pragma once
 #include "esp_lcd_types.h"
+#include "esp_lcd_panel_ops.h"
 
 #ifdef __cplusplus
 extern "C" {

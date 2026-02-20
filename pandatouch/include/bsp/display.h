@@ -58,9 +58,8 @@ typedef struct {
  * @brief Create new display panel
  *
  * For maximum flexibility, this function performs only reset and initialization of the display.
- * You must turn on the display explicitly by calling esp_lcd_panel_disp_on_off().
- * The display's backlight is not turned on either. You can use bsp_display_backlight_on/off()
- * or bsp_display_brightness_set() to control it.
+ * The backlight is not enabled — call bsp_display_backlight_on() or bsp_display_brightness_set()
+ * after this function returns. Note: esp_lcd_panel_disp_on_off() is not supported on RGB panels.
  *
  * @note For RGB panels, ret_io will always be set to NULL (no IO bus).
  *

@@ -15,7 +15,8 @@
  *                 Gracefully shows "not connected" when the module is absent
  *
  * Threading model:
- *  - LVGL task (CPU0)       : drives lv_timer_handler; never blocks on I/O
+ *  - LVGL task (CPU1)       : drives lv_timer_handler; never blocks on I/O
+ *                             Pinned to CPU1 so IDLE0 on CPU0 runs freely and resets WDT
  *  - msc_app_task (CPU0, p5): USB mount/unmount; reads dir BEFORE taking LVGL lock
  *  - sensor_task (CPU1, p4) : reads AHT30 every 2 s; posts results to s_sensor_queue
  *  - LVGL sensor timer      : drains s_sensor_queue; zero blocking I2C inside LVGL task
@@ -396,7 +397,14 @@ void app_main(void)
 {
     sensor_init();
 
-    lv_display_t *disp = bsp_display_start();
+    bsp_display_cfg_t disp_cfg = {
+        .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
+        .buffer_size   = BSP_LCD_H_RES * CONFIG_BSP_LCD_DRAW_BUF_HEIGHT,
+        .double_buffer = CONFIG_BSP_LCD_DRAW_BUF_DOUBLE,
+        .flags         = { .buff_dma = false, .buff_spiram = false },
+    };
+    disp_cfg.lvgl_port_cfg.task_affinity = 1;
+    lv_display_t *disp = bsp_display_start_with_config(&disp_cfg);
     assert(disp);
     bsp_display_brightness_set(80);
 

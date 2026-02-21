@@ -5,7 +5,7 @@ name: Build examples
 
 on:
   push:
-    branches: [develop, master]
+    branches: [develop, main]
     paths:
       - 'pandatouch/**'
       - 'examples/**'
@@ -37,7 +37,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Python CI dependencies
-        run: pip install "idf-component-manager>=2,<3" py-markdown-table --upgrade
+        shell: bash
+        run: |
+          . ${IDF_PATH}/export.sh
+          pip install "idf-component-manager>=2,<3" py-markdown-table --upgrade
 
       # ── 1. Build the LVGL example (pandatouch/ must still exist) ──────────
       - name: Build display_hello
@@ -59,7 +62,9 @@ jobs:
       - name: Generate pandatouch_noglib
         shell: bash
         working-directory: ${{ github.workspace }}
-        run: python .github/ci/bsp_noglib.py pandatouch
+        run: |
+          . ${IDF_PATH}/export.sh
+          python .github/ci/bsp_noglib.py pandatouch
 
       # ── 4. Build the no-LVGL example (pandatouch_noglib/ now exists) ───────
       - name: Build display_noglib

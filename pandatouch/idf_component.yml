@@ -1,6 +1,7 @@
 version: "0.1.0"
 description: "Board Support Package for BigTreeTech Panda Touch (ESP32-S3)"
-url: "https://github.com/<org>/pandatouch-bsp"
+url: "https://github.com/fmauNeko/pandatouch-bsp"
+license: "MIT"
 targets:
   - esp32s3
 tags:
@@ -16,3 +17,4 @@ dependencies:
   espressif/usb_host_msc: "^1"
 examples:
   - path: ../examples/display_hello
+  - path: ../examples/display_demo

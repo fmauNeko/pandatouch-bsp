@@ -2,7 +2,7 @@ name: Push pandatouch_noglib to Espressif Component Service
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths: ['pandatouch/**', '.github/**']
   pull_request:
     types: [opened, reopened, synchronize]
@@ -11,6 +11,8 @@ on:
 jobs:
   upload_noglib:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - name: Generate pandatouch_noglib
@@ -20,7 +22,6 @@ jobs:
       - uses: espressif/upload-components-ci-action@v2
         with:
           components: pandatouch_noglib
-          namespace: "<org>"
-          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
-          dry_run: ${{ github.ref_name != 'master' || github.repository_owner != '<org>' }}
+          namespace: "fmauneko"
+          dry_run: ${{ github.ref_name != 'main' || github.repository_owner != 'fmauNeko' }}
           commit_sha: ''

@@ -15,10 +15,11 @@
  *                 Gracefully shows "not connected" when the module is absent
  *
  * Threading model:
- *  - LVGL task (CPU1)       : drives lv_timer_handler; never blocks on I/O
- *                             Pinned to CPU1 so IDLE0 on CPU0 runs freely and resets WDT
+ *  - LVGL task (no affinity): drives lv_timer_handler; never blocks on I/O
+ *                             LVGL heap routed to PSRAM so large sub-layer buffers can be
+ *                             allocated without exhausting the small internal SRAM heap.
  *  - msc_app_task (CPU0, p5): USB mount/unmount; reads dir BEFORE taking LVGL lock
- *  - sensor_task (CPU1, p4) : reads AHT30 every 2 s; posts results to s_sensor_queue
+ *  - sensor_task (CPU0, p4) : reads AHT30 every 2 s; posts results to s_sensor_queue
  *  - LVGL sensor timer      : drains s_sensor_queue; zero blocking I2C inside LVGL task
  */
 
@@ -33,6 +34,7 @@
 #include "esp_log.h"
 #include "driver/i2c_master.h"
 
+#include "esp_heap_caps.h"
 #include "bsp/esp-bsp.h"
 #include "aht30.h"
 
@@ -52,7 +54,7 @@ typedef struct {
 static QueueHandle_t s_sensor_queue = NULL;
 
 /* ── USB file list snapshot (read outside LVGL lock) ───────────────────── */
-#define USB_MAX_FILES  128
+#define USB_MAX_FILES  32
 #define USB_NAME_MAX   256
 
 typedef struct {
@@ -213,10 +215,9 @@ static void usb_update(void)
         return;
     }
     usb_snapshot_read(snap);
-    if (bsp_display_lock(500)) {
-        usb_snapshot_render(snap);
-        bsp_display_unlock();
-    }
+    bsp_display_lock(portMAX_DELAY);
+    usb_snapshot_render(snap);
+    bsp_display_unlock();
     free(snap);
 }
 
@@ -391,20 +392,45 @@ static void ui_create(void)
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  LVGL custom allocator — routes LVGL heap to PSRAM
+ *
+ *  LVGL's default internal TLSF heap is ~64 KB of SRAM, which is too small
+ *  for the 768 KB sub-layer buffer it needs when compositing the USB list.
+ *  Without this, lv_draw_layer_alloc_buf() fails, the draw task stays WAITING
+ *  forever, draw_buf_flush() spins infinitely and the WDT fires.
+ *
+ *  Enabled by CONFIG_LV_USE_CUSTOM_MALLOC=y in sdkconfig.defaults.
+ * ════════════════════════════════════════════════════════════════════════════ */
+void lv_mem_init(void)    { }
+void lv_mem_deinit(void)  { }
+
+void *lv_malloc_core(size_t size)
+{
+    void *p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p) {
+        p = heap_caps_malloc(size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    }
+    return p;
+}
+
+void *lv_realloc_core(void *p, size_t new_size)
+{
+    return heap_caps_realloc(p, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+}
+
+void lv_free_core(void *p)
+{
+    heap_caps_free(p);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  Entry point
  * ════════════════════════════════════════════════════════════════════════════ */
 void app_main(void)
 {
     sensor_init();
 
-    bsp_display_cfg_t disp_cfg = {
-        .lvgl_port_cfg = ESP_LVGL_PORT_INIT_CONFIG(),
-        .buffer_size   = BSP_LCD_H_RES * CONFIG_BSP_LCD_DRAW_BUF_HEIGHT,
-        .double_buffer = CONFIG_BSP_LCD_DRAW_BUF_DOUBLE,
-        .flags         = { .buff_dma = false, .buff_spiram = false },
-    };
-    disp_cfg.lvgl_port_cfg.task_affinity = 1;
-    lv_display_t *disp = bsp_display_start_with_config(&disp_cfg);
+    lv_display_t *disp = bsp_display_start();
     assert(disp);
     bsp_display_brightness_set(80);
 

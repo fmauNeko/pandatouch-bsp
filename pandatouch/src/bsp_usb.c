@@ -90,6 +90,13 @@ static void msc_event_cb(const msc_host_event_t *event, void *arg)
     }
 }
 
+static const msc_host_driver_config_t s_msc_driver_config = {
+    .create_backround_task = true,
+    .task_priority         = 5,
+    .stack_size            = 4096,
+    .callback              = msc_event_cb,
+};
+
 /* -------------------------------------------------------------------------
  * MSC application task
  * Installs the MSC device and mounts the VFS on connect;
@@ -147,6 +154,19 @@ static void msc_app_task(void *arg)
                 msc_host_uninstall_device(s_msc_device);
                 s_msc_device = NULL;
             }
+
+            ESP_LOGI(TAG, "Reinitialising MSC driver for next hotplug");
+            esp_err_t reinit_ret = msc_host_uninstall();
+            if (reinit_ret != ESP_OK) {
+                ESP_LOGE(TAG, "msc_host_uninstall failed: %s", esp_err_to_name(reinit_ret));
+            } else {
+                reinit_ret = msc_host_install(&s_msc_driver_config);
+                if (reinit_ret != ESP_OK) {
+                    ESP_LOGE(TAG, "msc_host_install (reinit) failed: %s", esp_err_to_name(reinit_ret));
+                } else {
+                    ESP_LOGI(TAG, "MSC driver reinitialised, ready for next plug-in");
+                }
+            }
         }
     }
 
@@ -178,13 +198,7 @@ esp_err_t bsp_usb_start(void)
     }
 
     /* 3. Install MSC host driver (creates its own background task) */
-    const msc_host_driver_config_t msc_config = {
-        .create_backround_task = true,
-        .task_priority         = 5,
-        .stack_size            = 4096,
-        .callback              = msc_event_cb,
-    };
-    BSP_ERROR_CHECK_RETURN_ERR(msc_host_install(&msc_config));
+    BSP_ERROR_CHECK_RETURN_ERR(msc_host_install(&s_msc_driver_config));
 
     /* 4. Start app task that processes device connect/disconnect events */
     if (xTaskCreate(msc_app_task, "msc_app", 4096, NULL, 5, &s_msc_app_task) != pdTRUE) {

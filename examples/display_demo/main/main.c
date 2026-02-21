@@ -13,6 +13,12 @@
  *  - USB        : File browser — lists files/directories from an inserted USB drive
  *  - Sensor     : Live temperature & humidity from the optional Panda Sense (AHT30)
  *                 Gracefully shows "not connected" when the module is absent
+ *
+ * Threading model:
+ *  - LVGL task (CPU0)       : drives lv_timer_handler; never blocks on I/O
+ *  - msc_app_task (CPU0, p5): USB mount/unmount; reads dir BEFORE taking LVGL lock
+ *  - sensor_task (CPU1, p4) : reads AHT30 every 2 s; posts results to s_sensor_queue
+ *  - LVGL sensor timer      : drains s_sensor_queue; zero blocking I2C inside LVGL task
  */
 
 #include <stdio.h>
@@ -22,6 +28,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "esp_log.h"
 #include "driver/i2c_master.h"
 
@@ -31,9 +38,33 @@
 static const char *TAG = "demo";
 
 /* ── AHT30 on external I2C header (I2C1 / GPIO3+4) ─────────────────────── */
-static i2c_master_bus_handle_t s_ext_i2c  = NULL;
-static aht30_handle_t          s_aht30    = NULL;
-static bool                    s_sensor_ok = false;
+static i2c_master_bus_handle_t s_ext_i2c    = NULL;
+static aht30_handle_t          s_aht30      = NULL;
+static bool                    s_sensor_ok  = false;
+
+/* Sensor reading passed from sensor_task → LVGL timer via queue (depth=1) */
+typedef struct {
+    float temp;
+    float hum;
+    bool  ok;
+} sensor_reading_t;
+static QueueHandle_t s_sensor_queue = NULL;
+
+/* ── USB file list snapshot (read outside LVGL lock) ───────────────────── */
+#define USB_MAX_FILES  128
+#define USB_NAME_MAX   256
+
+typedef struct {
+    char     name[USB_NAME_MAX];
+    uint8_t  is_dir;
+} usb_entry_t;
+
+typedef struct {
+    usb_entry_t entries[USB_MAX_FILES];
+    int         count;
+    bool        open_ok;
+    bool        mounted;
+} usb_snapshot_t;
 
 /* ── LVGL widget refs (set during ui_create, used in callbacks) ─────────── */
 static lv_obj_t *s_brightness_label = NULL;
@@ -85,71 +116,119 @@ static void sensor_init(void)
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
- *  USB file list
- *  MUST be called with the LVGL lock held.
+ *  Sensor task — runs on CPU1, posts to queue; never touches LVGL
  * ════════════════════════════════════════════════════════════════════════════ */
-static void usb_list_refresh(void)
+static void sensor_task(void *arg)
+{
+    (void)arg;
+    sensor_reading_t reading;
+    while (1) {
+        reading.ok = (aht30_get_temperature_humidity_value(s_aht30,
+                          &reading.temp, &reading.hum) == ESP_OK);
+        xQueueOverwrite(s_sensor_queue, &reading);
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+ *  USB file list — two-phase update
+ *
+ *  usb_snapshot_read()   : block I/O OUTSIDE the LVGL lock
+ *  usb_snapshot_render() : LVGL calls INSIDE the LVGL lock
+ *
+ *  Keeping filesystem I/O outside the LVGL mutex prevents the LVGL task
+ *  from starving IDLE0 during USB block reads (root cause of WDT crash).
+ * ════════════════════════════════════════════════════════════════════════════ */
+static void usb_snapshot_read(usb_snapshot_t *snap)
+{
+    snap->count   = 0;
+    snap->open_ok = false;
+    snap->mounted = bsp_usb_is_mounted();
+
+    if (!snap->mounted) {
+        return;
+    }
+
+    DIR *dir = opendir("/usb");
+    if (!dir) {
+        return;
+    }
+    snap->open_ok = true;
+
+    struct dirent *ent;
+    while ((ent = readdir(dir)) != NULL && snap->count < USB_MAX_FILES) {
+        if (ent->d_name[0] == '.') {
+            continue;
+        }
+        usb_entry_t *e = &snap->entries[snap->count++];
+        strlcpy(e->name, ent->d_name, sizeof(e->name));
+        e->is_dir = (ent->d_type == DT_DIR);
+    }
+    closedir(dir);
+}
+
+static void usb_snapshot_render(const usb_snapshot_t *snap)
 {
     lv_obj_clean(s_usb_list);
 
-    if (!bsp_usb_is_mounted()) {
+    if (!snap->mounted) {
         lv_label_set_text(s_usb_status, LV_SYMBOL_USB "  No USB drive connected");
         lv_obj_clear_flag(s_usb_status, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_usb_list, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
-    DIR *dir = opendir("/usb");
-    if (!dir) {
+    if (!snap->open_ok) {
         lv_label_set_text(s_usb_status, LV_SYMBOL_WARNING "  Failed to open /usb");
         lv_obj_clear_flag(s_usb_status, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(s_usb_list, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
-    int count = 0;
-    struct dirent *ent;
-    while ((ent = readdir(dir)) != NULL) {
-        if (ent->d_name[0] == '.') {
-            continue;  /* skip . and .. */
-        }
-        const char *icon = (ent->d_type == DT_DIR)
-                           ? LV_SYMBOL_DIRECTORY "  "
-                           : LV_SYMBOL_FILE      "  ";
-        char line[272];  /* LV_SYMBOL (6 bytes) + "  " (2) + NAME_MAX (255) + NUL */
-        snprintf(line, sizeof(line), "%s%s", icon, ent->d_name);
-        lv_list_add_text(s_usb_list, line);
-        count++;
-    }
-    closedir(dir);
-
-    if (count == 0) {
-        lv_obj_add_flag(s_usb_list, LV_OBJ_FLAG_HIDDEN);
+    if (snap->count == 0) {
         lv_label_set_text(s_usb_status, LV_SYMBOL_USB "  Drive is empty");
         lv_obj_clear_flag(s_usb_status, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(s_usb_status, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(s_usb_list, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(s_usb_list, LV_OBJ_FLAG_HIDDEN);
+        return;
     }
+
+    char line[USB_NAME_MAX + 8];
+    for (int i = 0; i < snap->count; i++) {
+        const char *icon = snap->entries[i].is_dir
+                           ? LV_SYMBOL_DIRECTORY "  "
+                           : LV_SYMBOL_FILE      "  ";
+        snprintf(line, sizeof(line), "%s%s", icon, snap->entries[i].name);
+        lv_list_add_text(s_usb_list, line);
+    }
+    lv_obj_add_flag(s_usb_status, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(s_usb_list, LV_OBJ_FLAG_HIDDEN);
 }
 
-/* USB mount / unmount callbacks — run in the MSC task, not the LVGL task */
+static void usb_update(void)
+{
+    usb_snapshot_t *snap = malloc(sizeof(usb_snapshot_t));
+    if (!snap) {
+        ESP_LOGE(TAG, "USB snapshot alloc failed");
+        return;
+    }
+    usb_snapshot_read(snap);
+    if (bsp_display_lock(500)) {
+        usb_snapshot_render(snap);
+        bsp_display_unlock();
+    }
+    free(snap);
+}
+
 static void on_usb_mount(void)
 {
     ESP_LOGI(TAG, "USB mounted");
-    if (bsp_display_lock(500)) {
-        usb_list_refresh();
-        bsp_display_unlock();
-    }
+    usb_update();
 }
 
 static void on_usb_unmount(void)
 {
     ESP_LOGI(TAG, "USB removed");
-    if (bsp_display_lock(500)) {
-        usb_list_refresh();
-        bsp_display_unlock();
-    }
+    usb_update();
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -167,11 +246,13 @@ static void brightness_cb(lv_event_t *e)
 static void sensor_timer_cb(lv_timer_t *t)
 {
     (void)t;
-    float temp = 0.0f, hum = 0.0f;
-    if (aht30_get_temperature_humidity_value(s_aht30, &temp, &hum) == ESP_OK) {
-        /* lv_snprintf has LV_SPRINTF_USE_FLOAT=0 by default — use integer math */
-        int t10 = (int)(temp * 10.0f + (temp >= 0.0f ? 0.5f : -0.5f));
-        int h10 = (int)(hum  * 10.0f + 0.5f);
+    sensor_reading_t reading;
+    if (xQueueReceive(s_sensor_queue, &reading, 0) != pdTRUE) {
+        return;
+    }
+    if (reading.ok) {
+        int t10 = (int)(reading.temp * 10.0f + (reading.temp >= 0.0f ? 0.5f : -0.5f));
+        int h10 = (int)(reading.hum  * 10.0f + 0.5f);
         lv_label_set_text_fmt(s_temp_label,
                               "%d.%d" "\xc2\xb0" "C",
                               t10 / 10, abs(t10 % 10));
@@ -293,9 +374,7 @@ static void ui_create(void)
         lv_obj_set_style_text_font(s_hum_label, &lv_font_montserrat_48, 0);
         lv_obj_set_style_text_color(s_hum_label, COL_CYAN, 0);
 
-        /* Fire immediately on the first LVGL tick, then every 2 s */
-        lv_timer_t *t = lv_timer_create(sensor_timer_cb, 2000, NULL);
-        lv_timer_ready(t);
+        lv_timer_create(sensor_timer_cb, 250, NULL);
     } else {
         lv_obj_t *msg = lv_label_create(tab_sen);
         lv_label_set_text(msg,
@@ -315,20 +394,25 @@ static void ui_create(void)
  * ════════════════════════════════════════════════════════════════════════════ */
 void app_main(void)
 {
-    /* 1. Probe AHT30 before LVGL starts — I2C bus init has no LVGL dependency */
     sensor_init();
 
-    /* 2. Start display + touch + LVGL */
     lv_display_t *disp = bsp_display_start();
     assert(disp);
     bsp_display_brightness_set(80);
 
-    /* 3. Build UI (must hold LVGL mutex) */
+    if (s_sensor_ok) {
+        s_sensor_queue = xQueueCreate(1, sizeof(sensor_reading_t));
+        assert(s_sensor_queue);
+    }
+
     bsp_display_lock(0);
     ui_create();
     bsp_display_unlock();
 
-    /* 4. Register USB callbacks and start MSC host */
+    if (s_sensor_ok) {
+        xTaskCreatePinnedToCore(sensor_task, "sensor", 4096, NULL, 4, NULL, 1);
+    }
+
     bsp_usb_on_mount(on_usb_mount);
     bsp_usb_on_unmount(on_usb_unmount);
     bsp_usb_start();

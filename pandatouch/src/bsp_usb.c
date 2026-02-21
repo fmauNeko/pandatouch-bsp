@@ -43,12 +43,15 @@ static bsp_usb_event_cb_t s_on_mount   = NULL;
 static bsp_usb_event_cb_t s_on_unmount = NULL;
 
 /* State */
-static volatile bool             s_mounted         = false;
-static msc_host_device_handle_t  s_msc_device      = NULL;
-static msc_host_vfs_handle_t     s_vfs_handle      = NULL;
-static TaskHandle_t              s_usb_host_task   = NULL;
-static TaskHandle_t              s_msc_app_task    = NULL;
-static QueueHandle_t             s_usb_event_queue = NULL;
+static volatile bool             s_mounted                 = false;
+static volatile bool             s_usb_host_shutdown       = false;
+static volatile bool             s_msc_evt_handler_running = false;
+static msc_host_device_handle_t  s_msc_device              = NULL;
+static msc_host_vfs_handle_t     s_vfs_handle              = NULL;
+static TaskHandle_t              s_usb_host_task            = NULL;
+static TaskHandle_t              s_msc_app_task             = NULL;
+static TaskHandle_t              s_msc_evt_handler_task     = NULL;
+static QueueHandle_t             s_usb_event_queue          = NULL;
 
 /* -------------------------------------------------------------------------
  * USB Host Library event task
@@ -62,7 +65,7 @@ static void usb_host_task(void *arg)
         if (event_flags & USB_HOST_LIB_EVENT_FLAGS_NO_CLIENTS) {
             usb_host_device_free_all();
         }
-        if (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE) {
+        if (s_usb_host_shutdown && (event_flags & USB_HOST_LIB_EVENT_FLAGS_ALL_FREE)) {
             break;
         }
     }
@@ -91,11 +94,37 @@ static void msc_event_cb(const msc_host_event_t *event, void *arg)
 }
 
 static const msc_host_driver_config_t s_msc_driver_config = {
-    .create_backround_task = true,
+    .create_backround_task = false,
     .task_priority         = 5,
     .stack_size            = 4096,
     .callback              = msc_event_cb,
 };
+
+/* -------------------------------------------------------------------------
+ * MSC host event loop task
+ * Pumps msc_host_handle_events() so USB client events (NEW_DEV / DEV_GONE)
+ * are delivered to msc_event_cb().  We own this task (create_background_task
+ * = false) so we can detect an unexpected exit and restart it after a
+ * disconnect, without going through a full msc_host_uninstall/install cycle.
+ * -------------------------------------------------------------------------*/
+static void msc_evt_handler_task(void *arg)
+{
+    s_msc_evt_handler_running = true;
+    while (msc_host_handle_events(portMAX_DELAY) == ESP_OK) {
+    }
+    s_msc_evt_handler_running = false;
+    vTaskDelete(NULL);
+}
+
+static esp_err_t start_msc_evt_handler_task(void)
+{
+    if (xTaskCreate(msc_evt_handler_task, "msc_evt", 4096, NULL, 5,
+                    &s_msc_evt_handler_task) != pdTRUE) {
+        ESP_LOGE(TAG, "Failed to create MSC event handler task");
+        return ESP_FAIL;
+    }
+    return ESP_OK;
+}
 
 /* -------------------------------------------------------------------------
  * MSC application task
@@ -155,17 +184,9 @@ static void msc_app_task(void *arg)
                 s_msc_device = NULL;
             }
 
-            ESP_LOGI(TAG, "Reinitialising MSC driver for next hotplug");
-            esp_err_t reinit_ret = msc_host_uninstall();
-            if (reinit_ret != ESP_OK) {
-                ESP_LOGE(TAG, "msc_host_uninstall failed: %s", esp_err_to_name(reinit_ret));
-            } else {
-                reinit_ret = msc_host_install(&s_msc_driver_config);
-                if (reinit_ret != ESP_OK) {
-                    ESP_LOGE(TAG, "msc_host_install (reinit) failed: %s", esp_err_to_name(reinit_ret));
-                } else {
-                    ESP_LOGI(TAG, "MSC driver reinitialised, ready for next plug-in");
-                }
+            if (!s_msc_evt_handler_running) {
+                ESP_LOGW(TAG, "MSC event handler exited after disconnect, restarting");
+                start_msc_evt_handler_task();
             }
         }
     }
@@ -197,10 +218,13 @@ esp_err_t bsp_usb_start(void)
         return ESP_FAIL;
     }
 
-    /* 3. Install MSC host driver (creates its own background task) */
+    /* 3. Install MSC host driver (no internal background task — we manage ours) */
     BSP_ERROR_CHECK_RETURN_ERR(msc_host_install(&s_msc_driver_config));
 
-    /* 4. Start app task that processes device connect/disconnect events */
+    /* 4. Start our MSC host event loop task */
+    BSP_ERROR_CHECK_RETURN_ERR(start_msc_evt_handler_task());
+
+    /* 5. Start app task that processes device connect/disconnect events */
     if (xTaskCreate(msc_app_task, "msc_app", 4096, NULL, 5, &s_msc_app_task) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create MSC app task");
         return ESP_FAIL;
@@ -224,14 +248,13 @@ void bsp_usb_stop(void)
     /* Deregister MSC as a USB client (stops MSC background task) */
     msc_host_uninstall();
 
-    /* Free remaining USB devices, then uninstall the host stack.
-     * usb_host_task() will detect USB_HOST_LIB_EVENT_FLAGS_ALL_FREE and exit. */
+    /* Signal usb_host_task to exit on ALL_FREE, then tear down the host stack */
+    s_usb_host_shutdown = true;
     usb_host_device_free_all();
     usb_host_uninstall();
 
     s_mounted = false;
 
-    /* Stop the application task and release the event queue */
     if (s_msc_app_task) {
         vTaskDelete(s_msc_app_task);
         s_msc_app_task = NULL;
@@ -241,7 +264,8 @@ void bsp_usb_stop(void)
         s_usb_event_queue = NULL;
     }
 
-    s_usb_host_task = NULL; /* task exits on its own after ALL_FREE */
+    s_usb_host_task        = NULL;
+    s_msc_evt_handler_task = NULL;
 }
 
 bool bsp_usb_is_mounted(void)

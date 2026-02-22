@@ -2,8 +2,7 @@ name: Push pandatouch_noglib to Espressif Component Service
 
 on:
   push:
-    branches: [main]
-    paths: ['pandatouch/**', '.github/**']
+    tags: ['pandatouch-v*']
   pull_request:
     types: [opened, reopened, synchronize]
     paths: ['pandatouch/**', '.github/**']
@@ -23,5 +22,5 @@ jobs:
         with:
           components: pandatouch_noglib
           namespace: "fmauneko"
-          dry_run: ${{ github.ref_name != 'main' || github.repository_owner != 'fmauNeko' }}
+          dry_run: ${{ !startsWith(github.ref, 'refs/tags/pandatouch-v') || github.repository_owner != 'fmauNeko' }}
           commit_sha: ''

@@ -123,8 +123,9 @@ def bsp_no_glib_all(bsp_names):
         ret += add_notice_to_readme(bsp_path)
         try:
             check_bsp_readme(bsp_path)
-        except Exception:
-            pass  # Exception here means that the README.md was modified, which is OK here
+        except Exception as e:
+            # README.md was modified by the noglib generation, which is expected here
+            print(f"[DEBUG] check_bsp_readme: {type(e).__name__}: {e}")
     return ret
 
 

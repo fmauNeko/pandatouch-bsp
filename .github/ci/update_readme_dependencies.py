@@ -61,6 +61,7 @@ capability_dict = {
     "SENSOR_LIGHT": r"(bh1750$)",
     "SENSOR_MAG": r"(mag3110$)",
     "LVGL_PORT": r"(esp_lvgl_port$)",
+    "USB_MSC": r"(usb_host_msc$)",
 }
 # Emoji map for capabilities
 capability_emojis = {
@@ -451,7 +452,7 @@ def check_all_bsps(filenames):
         bsp_path = Path(f)
         if not bsp_path.exists():
             print("[Error] Argument {} does not point to existing BSP".format(f))
-            raise FileNotFoundError(f"BSP path does not exist: {bsp}")
+            raise FileNotFoundError(f"BSP path does not exist: {bsp_path}")
 
         if not bsp_path.is_dir():
             if bsp_path.suffix == ".h":

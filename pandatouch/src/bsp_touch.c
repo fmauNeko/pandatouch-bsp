@@ -35,6 +35,9 @@ esp_err_t bsp_i2c_init(void)
 
 esp_err_t bsp_i2c_deinit(void)
 {
+    if (!i2c_initialized) {
+        return ESP_OK;
+    }
     BSP_ERROR_CHECK_RETURN_ERR(i2c_del_master_bus(i2c_handle));
     i2c_handle = NULL;
     i2c_initialized = false;
@@ -43,7 +46,9 @@ esp_err_t bsp_i2c_deinit(void)
 
 i2c_master_bus_handle_t bsp_i2c_get_handle(void)
 {
-    bsp_i2c_init();
+    if (bsp_i2c_init() != ESP_OK) {
+        return NULL;
+    }
     return i2c_handle;
 }
 

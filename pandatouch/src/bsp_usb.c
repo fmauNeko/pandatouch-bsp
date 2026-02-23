@@ -45,6 +45,9 @@ static bsp_usb_event_cb_t s_on_unmount = NULL;
 /* State */
 static volatile bool             s_mounted                 = false;
 static volatile bool             s_usb_host_shutdown       = false;
+/* s_msc_evt_handler_running has a single writer (msc_evt_handler_task).
+ * volatile is sufficient for cross-core visibility on ESP32-S3.
+ * The single-writer pattern guarantees no concurrent writes. */
 static volatile bool             s_msc_evt_handler_running = false;
 static msc_host_device_handle_t  s_msc_device              = NULL;
 static msc_host_vfs_handle_t     s_vfs_handle              = NULL;
@@ -210,23 +213,56 @@ esp_err_t bsp_usb_start(void)
         .skip_phy_setup = false,
         .intr_flags     = ESP_INTR_FLAG_LEVEL1,
     };
-    BSP_ERROR_CHECK_RETURN_ERR(usb_host_install(&host_config));
+    esp_err_t ret = usb_host_install(&host_config);
+    if (ret != ESP_OK) {
+        vQueueDelete(s_usb_event_queue);
+        s_usb_event_queue = NULL;
+        return ret;
+    }
 
     /* 2. Start USB host library event task */
     if (xTaskCreate(usb_host_task, "usb_host", 4096, NULL, 5, &s_usb_host_task) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create USB host task");
+        usb_host_uninstall();
+        vQueueDelete(s_usb_event_queue);
+        s_usb_event_queue = NULL;
         return ESP_FAIL;
     }
 
     /* 3. Install MSC host driver (no internal background task — we manage ours) */
-    BSP_ERROR_CHECK_RETURN_ERR(msc_host_install(&s_msc_driver_config));
+    ret = msc_host_install(&s_msc_driver_config);
+    if (ret != ESP_OK) {
+        vTaskDelete(s_usb_host_task);
+        s_usb_host_task = NULL;
+        usb_host_uninstall();
+        vQueueDelete(s_usb_event_queue);
+        s_usb_event_queue = NULL;
+        return ret;
+    }
 
     /* 4. Start our MSC host event loop task */
-    BSP_ERROR_CHECK_RETURN_ERR(start_msc_evt_handler_task());
+    ret = start_msc_evt_handler_task();
+    if (ret != ESP_OK) {
+        /* Note: start_msc_evt_handler_task handles its own task cleanup on failure */
+        msc_host_uninstall();
+        vTaskDelete(s_usb_host_task);
+        s_usb_host_task = NULL;
+        usb_host_uninstall();
+        vQueueDelete(s_usb_event_queue);
+        s_usb_event_queue = NULL;
+        return ret;
+    }
 
     /* 5. Start app task that processes device connect/disconnect events */
     if (xTaskCreate(msc_app_task, "msc_app", 4096, NULL, 5, &s_msc_app_task) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create MSC app task");
+        /* Note: msc_evt_handler_task will self-terminate when we set flag */
+        s_msc_evt_handler_running = false;
+        vTaskDelay(pdMS_TO_TICKS(100)); /* Give task time to exit */
+        msc_host_uninstall();
+        usb_host_uninstall();
+        vQueueDelete(s_usb_event_queue);
+        s_usb_event_queue = NULL;
         return ESP_FAIL;
     }
 
@@ -245,6 +281,15 @@ void bsp_usb_stop(void)
         s_msc_device = NULL;
     }
 
+    /* Signal msc_app_task to exit gracefully before tearing down resources */
+    if (s_msc_app_task && s_usb_event_queue) {
+        usb_msc_evt_t stop_evt = { .type = USB_MSC_EVT_DISCONNECTED, .handle = NULL };
+        xQueueSend(s_usb_event_queue, &stop_evt, portMAX_DELAY);
+        vTaskDelay(pdMS_TO_TICKS(100)); /* Give task time to process stop event and exit */
+        vTaskDelete(s_msc_app_task);
+        s_msc_app_task = NULL;
+    }
+
     /* Deregister MSC as a USB client (stops MSC background task) */
     msc_host_uninstall();
 
@@ -255,15 +300,13 @@ void bsp_usb_stop(void)
 
     s_mounted = false;
 
-    if (s_msc_app_task) {
-        vTaskDelete(s_msc_app_task);
-        s_msc_app_task = NULL;
-    }
     if (s_usb_event_queue) {
         vQueueDelete(s_usb_event_queue);
         s_usb_event_queue = NULL;
     }
 
+    /* usb_host_task and msc_evt_handler_task exit on their own (see usb_host_lib_handle_events() and msc_evt_handler_task())
+     * No explicit deletion needed - they self-terminate when host stack is torn down */
     s_usb_host_task        = NULL;
     s_msc_evt_handler_task = NULL;
 }

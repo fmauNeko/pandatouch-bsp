@@ -242,7 +242,11 @@ void bsp_display_unlock(void)
 
 void bsp_display_rotate(lv_display_t *disp, lv_disp_rotation_t rotation)
 {
+#if (LVGL_VERSION_MAJOR >= 9)
+    lv_display_set_rotation(disp, (lv_display_rotation_t)rotation);
+#else
     lv_disp_set_rotation(disp, rotation);
+#endif
 }
 
 esp_err_t bsp_display_enter_sleep(void)

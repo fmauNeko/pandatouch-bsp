@@ -458,5 +458,7 @@ void app_main(void)
 
     bsp_usb_on_mount(on_usb_mount);
     bsp_usb_on_unmount(on_usb_unmount);
-    bsp_usb_start();
+    if (bsp_usb_start() != ESP_OK) {
+        ESP_LOGW(TAG, "USB MSC host init failed — USB tab will show 'not connected'");
+    }
 }

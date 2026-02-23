@@ -389,10 +389,7 @@ def check_bsp_readme(bsp_path) -> Any:
             print(f"{bsp_name} README.md capabilities updated")
         else:
             print(f"{bsp_name} README.md capabilities is up to date")
-    else:
-        print(f"Markers capabilities not in {bsp_name} README.md")
-
-    content = updated_content  # Use updated content for subsequent sections
+        content = updated_content  # Use updated content for subsequent sections
     else:
         print(f"Markers capabilities not in {bsp_name} README.md")
 

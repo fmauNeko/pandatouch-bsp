@@ -415,7 +415,13 @@ void *lv_malloc_core(size_t size)
 
 void *lv_realloc_core(void *p, size_t new_size)
 {
-    return heap_caps_realloc(p, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    void *new_p = heap_caps_realloc(p, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!new_p && p) {
+        /* Fallback: try internal RAM if PSRAM realloc failed.
+         * Handles the case where original block was allocated in internal RAM. */
+        new_p = heap_caps_realloc(p, new_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    }
+    return new_p;
 }
 
 void lv_free_core(void *p)
@@ -436,14 +442,17 @@ void app_main(void)
 
     if (s_sensor_ok) {
         s_sensor_queue = xQueueCreate(1, sizeof(sensor_reading_t));
-        assert(s_sensor_queue);
+        if (s_sensor_queue == NULL) {
+            ESP_LOGE(TAG, "Failed to create sensor queue; disabling sensor task");
+            s_sensor_ok = false;
+        }
     }
 
     bsp_display_lock(0);
     ui_create();
     bsp_display_unlock();
 
-    if (s_sensor_ok) {
+    if (s_sensor_ok && s_sensor_queue != NULL) {
         xTaskCreatePinnedToCore(sensor_task, "sensor", 4096, NULL, 4, NULL, 1);
     }
 

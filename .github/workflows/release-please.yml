@@ -49,3 +49,14 @@ jobs:
           fi
 
           git push
+
+  upload_components:
+    name: Trigger components upload
+    if: ${{ needs.release.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    needs: [release]
+    steps:
+      - name: Trigger upload_component workflows
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: upload-component

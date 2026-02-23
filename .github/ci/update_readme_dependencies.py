@@ -26,7 +26,7 @@ BENCHMARK_START = "<!-- START_BENCHMARK -->"
 BENCHMARK_END = "<!-- END_BENCHMARK -->"
 ESP_REGISTRY_URL = "https://components.espressif.com/components/"
 BENCHMARK_RELEASE_URL = (
-    "https://github.com/espressif/esp-bsp/releases/download/benchmark-latest/"
+    "https://github.com/fmauNeko/pandatouch-bsp/releases/download/benchmark-latest/"
 )
 CAPABILITIES_PREFIX = "#define BSP_CAPS_"
 
@@ -40,7 +40,7 @@ This constant dictionary maps 'BSP Capabilities' to 'Component names'
 TODO: Make this 'smart'. ATM, we must update this table when e.g. a new IMU component is implemented
 """
 capability_dict = {
-    "DISPLAY": r"(esp_lcd_[^touch].*|^idf$)",  # All esp_lcd prefixes, but no esp_lcd_touch prefix. If not present, assume that the driver is native to idf
+    "DISPLAY": r"(esp_lcd_(?!touch_).*|^idf$)",  # All esp_lcd prefixes except esp_lcd_touch prefix. If not present, assume that the driver is native to idf
     "TOUCH": r"(esp_lcd_touch.*)",  # esp_lcd_touch prefix
     "BUTTONS": r"(button$)",  # TODO currently only this button driver is supported
     "AUDIO": r"(esp_codec_dev$)",  # TODO currently only this audio driver is supported
@@ -152,6 +152,8 @@ def get_capabilities_table(header_path, main_path, manifest):
                 result = re.search(
                     r"^" + CAPABILITIES_PREFIX + "([A-Z,_]*) *(0|1)", line
                 )
+                if result is None:
+                    continue
                 capability = result.group(1)
                 available = result.group(2) == "1"
                 component_versions = (
@@ -313,6 +315,33 @@ def is_tracked_by_git(path: Path) -> bool:
 
 
 def get_examples_table(bsp_name):
+    # Derive base repository URL from git remote or environment variable
+    base_repo_url = os.environ.get("BSP_REPO_URL")
+    if not base_repo_url:
+        try:
+            result = subprocess.run(
+                ["git", "config", "--get", "remote.origin.url"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            git_url = result.stdout.strip()
+            # Convert SSH URL to HTTPS if needed
+            if git_url.startswith("git@github.com:"):
+                base_repo_url = git_url.replace(
+                    "git@github.com:", "https://github.com/"
+                )
+            elif git_url.startswith("https://github.com/"):
+                base_repo_url = git_url
+            else:
+                # Fallback to hardcoded URL for unknown formats
+                base_repo_url = "https://github.com/fmauNeko/pandatouch-bsp"
+            # Remove .git suffix if present
+            base_repo_url = base_repo_url.replace(".git", "")
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback if git command fails
+            base_repo_url = "https://github.com/fmauNeko/pandatouch-bsp"
+
     rows = []
     for example_dir in sorted(EXAMPLES_DIR.iterdir()):
         if not example_dir.is_dir():
@@ -338,7 +367,7 @@ def get_examples_table(bsp_name):
         example_folder = example_dir.name
         flash_link = f"[Flash Example]({example_ref})" if example_ref != "" else "-"
         example_name = brief.split("BSP ")[-1]
-        row = f"| [{example_name}](https://github.com/espressif/esp-bsp/tree/master/examples/{example_folder}) | {details} | {flash_link} |"
+        row = f"| [{example_name}]({base_repo_url}/tree/master/examples/{example_folder}) | {details} | {flash_link} |"
         rows.append(row)
 
     active_table = "\n".join([EXAMPLES_TABLE_HEADER] + rows)

@@ -31,6 +31,7 @@
     } while(0)
 
 #define BSP_NULL_CHECK(x, ret) do {                             \
+        (void)(ret);                                             \
         if ((x) == NULL) {                                      \
             ESP_LOGE("BSP", "BSP null at %s:%d",                \
                      __FILE__, __LINE__);                        \

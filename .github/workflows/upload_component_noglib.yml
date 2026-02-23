@@ -6,6 +6,8 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
     paths: ["pandatouch/**", ".github/**"]
+  repository_dispatch:
+    types: [upload-component]
 
 jobs:
   upload_noglib:

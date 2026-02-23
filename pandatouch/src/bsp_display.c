@@ -251,7 +251,6 @@ void bsp_display_rotate(lv_display_t *disp, lv_disp_rotation_t rotation)
 
 esp_err_t bsp_display_enter_sleep(void)
 {
-    BSP_ERROR_CHECK_RETURN_ERR(esp_lcd_panel_disp_on_off(s_panel_handle, false));
     BSP_ERROR_CHECK_RETURN_ERR(bsp_display_backlight_off());
 
     return ESP_OK;
@@ -259,9 +258,8 @@ esp_err_t bsp_display_enter_sleep(void)
 
 esp_err_t bsp_display_exit_sleep(void)
 {
-    BSP_ERROR_CHECK_RETURN_ERR(esp_lcd_panel_disp_on_off(s_panel_handle, true));
     BSP_ERROR_CHECK_RETURN_ERR(bsp_display_backlight_on());
-
+    
     return ESP_OK;
 }
 #endif // BSP_CONFIG_NO_GRAPHIC_LIB == 0

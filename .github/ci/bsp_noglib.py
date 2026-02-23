@@ -26,7 +26,16 @@ def select_bsp_config_no_graphic_lib(bsp_path):
     try:
         with open(config_path, encoding="utf-8", mode="r") as header:
             content = header.read()
+        original_content = content
         content = content.replace(DEFINE_NOGLIB_OFF, DEFINE_NOGLIB_ON)
+        if content == original_content:
+            # No replacement occurred - DEFINE_NOGLIB_OFF not found
+            print(
+                "{}: could not find {} in config.h".format(
+                    str(bsp_path), DEFINE_NOGLIB_OFF
+                )
+            )
+            return 1
         with open(config_path, encoding="utf-8", mode="w", newline="\n") as header:
             header.write(content)
         return 0
@@ -66,7 +75,7 @@ def remove_examples(bsp_path):
     manager = ManifestManager(bsp_path, "bsp")
     try:
         del manager.manifest.examples
-    except KeyError:
+    except (AttributeError, KeyError):
         print("{}: no examples section found".format(str(bsp_path)))
         return 0
     manager.dump()
@@ -78,7 +87,7 @@ def add_notice_to_readme(bsp_path):
     bsp_name = bsp_path.parts[-1].removesuffix("_noglib")
 
     # Namespace for Espressif Component Registry (may differ from GitHub org)
-    namespace = "fmauneko"
+    namespace = os.environ.get("BSP_REGISTRY_NAMESPACE", "fmauneko")
 
     try:
         with open(readme_path, encoding="utf-8", mode="r") as readme:

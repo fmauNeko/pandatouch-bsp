@@ -7,6 +7,8 @@
 
 #include "esp_err.h"
 #include "esp_log.h"
+#include "esp_compiler.h"
+#include <stdlib.h>
 
 #ifdef CONFIG_BSP_ERROR_CHECK
 

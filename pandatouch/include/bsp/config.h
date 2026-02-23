@@ -5,8 +5,8 @@
  */
 #pragma once
 
-#if !defined(BSP_CONFIG_NO_GRAPHIC_LIB)
-#define BSP_CONFIG_NO_GRAPHIC_LIB (0)
+#ifndef BSP_CONFIG_NO_GRAPHIC_LIB
+#define BSP_CONFIG_NO_GRAPHIC_LIB 0
 #endif
 
 #ifndef CONFIG_BSP_LCD_DRAW_BUF_DOUBLE

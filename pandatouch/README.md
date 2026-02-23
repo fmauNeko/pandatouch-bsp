@@ -52,4 +52,4 @@ cd examples/display_noglib && idf.py build
 
 ## License
 
-Apache-2.0
+MIT

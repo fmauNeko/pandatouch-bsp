@@ -28,6 +28,7 @@ static const char *TAG = "bsp_usb";
 typedef enum {
     USB_MSC_EVT_CONNECTED,
     USB_MSC_EVT_DISCONNECTED,
+    USB_MSC_EVT_STOP,   /*!< Sentinel: instructs msc_app_task to exit cleanly */
 } usb_msc_evt_type_t;
 
 typedef struct {
@@ -121,6 +122,9 @@ static void msc_evt_handler_task(void *arg)
 
 static esp_err_t start_msc_evt_handler_task(void)
 {
+    /* Clear stale handle before (re-)creating the task */
+    s_msc_evt_handler_task = NULL;
+
     if (xTaskCreate(msc_evt_handler_task, "msc_evt", 4096, NULL, 5,
                     &s_msc_evt_handler_task) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create MSC event handler task");
@@ -133,9 +137,12 @@ static esp_err_t start_msc_evt_handler_task(void)
  * MSC application task
  * Installs the MSC device and mounts the VFS on connect;
  * unmounts and uninstalls on disconnect.
+ * On USB_MSC_EVT_STOP it performs the same unmount/uninstall cleanup as a
+ * normal disconnect, notifies the caller via task notification, then exits.
  * -------------------------------------------------------------------------*/
 static void msc_app_task(void *arg)
 {
+    TaskHandle_t caller = (TaskHandle_t)arg;
     usb_msc_evt_t evt;
 
     while (xQueueReceive(s_usb_event_queue, &evt, portMAX_DELAY)) {
@@ -170,11 +177,15 @@ static void msc_app_task(void *arg)
                 s_on_mount();
             }
 
-        } else if (evt.type == USB_MSC_EVT_DISCONNECTED) {
-            ESP_LOGI(TAG, "MSC device disconnected");
+        } else if (evt.type == USB_MSC_EVT_DISCONNECTED || evt.type == USB_MSC_EVT_STOP) {
+            if (evt.type == USB_MSC_EVT_DISCONNECTED) {
+                ESP_LOGI(TAG, "MSC device disconnected");
+            } else {
+                ESP_LOGI(TAG, "MSC app task stopping");
+            }
 
             s_mounted = false;
-            if (s_on_unmount) {
+            if (s_on_unmount && evt.type == USB_MSC_EVT_DISCONNECTED) {
                 s_on_unmount();
             }
 
@@ -187,9 +198,19 @@ static void msc_app_task(void *arg)
                 s_msc_device = NULL;
             }
 
+            if (evt.type == USB_MSC_EVT_STOP) {
+                if (caller) {
+                    xTaskNotifyGive(caller);
+                }
+                break;
+            }
+
             if (!s_msc_evt_handler_running) {
                 ESP_LOGW(TAG, "MSC event handler exited after disconnect, restarting");
-                start_msc_evt_handler_task();
+                esp_err_t ret = start_msc_evt_handler_task();
+                if (ret != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to restart MSC event handler task");
+                }
             }
         }
     }
@@ -253,13 +274,16 @@ esp_err_t bsp_usb_start(void)
         return ret;
     }
 
-    /* 5. Start app task that processes device connect/disconnect events */
-    if (xTaskCreate(msc_app_task, "msc_app", 4096, NULL, 5, &s_msc_app_task) != pdTRUE) {
+    /* 5. Start app task that processes device connect/disconnect events.
+     *    Pass our own task handle so msc_app_task can notify us on STOP. */
+    if (xTaskCreate(msc_app_task, "msc_app", 4096, (void *)xTaskGetCurrentTaskHandle(),
+                    5, &s_msc_app_task) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create MSC app task");
-        /* Note: msc_evt_handler_task will self-terminate when we set flag */
-        s_msc_evt_handler_running = false;
-        vTaskDelay(pdMS_TO_TICKS(100)); /* Give task time to exit */
+        vTaskDelete(s_msc_evt_handler_task);
+        s_msc_evt_handler_task = NULL;
         msc_host_uninstall();
+        vTaskDelete(s_usb_host_task);
+        s_usb_host_task = NULL;
         usb_host_uninstall();
         vQueueDelete(s_usb_event_queue);
         s_usb_event_queue = NULL;
@@ -271,21 +295,12 @@ esp_err_t bsp_usb_start(void)
 
 void bsp_usb_stop(void)
 {
-    /* Unmount and release device handles before tearing down the drivers */
-    if (s_vfs_handle) {
-        msc_host_vfs_unregister(s_vfs_handle);
-        s_vfs_handle = NULL;
-    }
-    if (s_msc_device) {
-        msc_host_uninstall_device(s_msc_device);
-        s_msc_device = NULL;
-    }
-
-    /* Signal msc_app_task to exit gracefully before tearing down resources */
+    /* Signal msc_app_task to perform its own cleanup and exit.
+     * It unmounts/uninstalls the device (avoiding a double-free) then notifies us. */
     if (s_msc_app_task && s_usb_event_queue) {
-        usb_msc_evt_t stop_evt = { .type = USB_MSC_EVT_DISCONNECTED, .handle = NULL };
+        usb_msc_evt_t stop_evt = { .type = USB_MSC_EVT_STOP, .handle = NULL };
         xQueueSend(s_usb_event_queue, &stop_evt, portMAX_DELAY);
-        vTaskDelay(pdMS_TO_TICKS(100)); /* Give task time to process stop event and exit */
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         vTaskDelete(s_msc_app_task);
         s_msc_app_task = NULL;
     }
@@ -305,8 +320,9 @@ void bsp_usb_stop(void)
         s_usb_event_queue = NULL;
     }
 
-    /* usb_host_task and msc_evt_handler_task exit on their own (see usb_host_lib_handle_events() and msc_evt_handler_task())
-     * No explicit deletion needed - they self-terminate when host stack is torn down */
+    /* usb_host_task and msc_evt_handler_task exit on their own
+     * (usb_host_lib_handle_events() and msc_host_handle_events() return errors
+     * once the host stack is torn down) — no explicit deletion needed. */
     s_usb_host_task        = NULL;
     s_msc_evt_handler_task = NULL;
 }

@@ -76,6 +76,10 @@ def remove_examples(bsp_path):
 def add_notice_to_readme(bsp_path):
     readme_path = bsp_path / "README.md"
     bsp_name = bsp_path.parts[-1].removesuffix("_noglib")
+
+    # Namespace for Espressif Component Registry (may differ from GitHub org)
+    namespace = "fmauneko"
+
     try:
         with open(readme_path, encoding="utf-8", mode="r") as readme:
             content = readme.readlines()
@@ -83,7 +87,7 @@ def add_notice_to_readme(bsp_path):
         content.insert(
             0,
             README_NOGLIB_NOTICE.format(
-                bsp_name, bsp_name, ESP_REGISTRY_URL + "espressif/" + bsp_name
+                bsp_name, bsp_name, ESP_REGISTRY_URL + namespace + "/" + bsp_name
             ),
         )
         with open(readme_path, encoding="utf-8", mode="w", newline="\n") as readme:
@@ -100,7 +104,7 @@ def bsp_no_glib_all(bsp_names):
         bsp_path = Path(bsp)
         if not bsp_path.exists():
             print("[Error] Argument {} does not point to existing BSP".format(bsp))
-            raise Exception
+            raise FileNotFoundError(f"BSP path does not exist: {bsp}")
 
         # 1. Move/copy the BSP to BSP_noglib
         noglib_path = Path(bsp + "_noglib")

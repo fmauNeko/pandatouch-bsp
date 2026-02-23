@@ -18,7 +18,10 @@ void app_main(void)
     ESP_ERROR_CHECK(bsp_display_backlight_on());
 
     uint16_t *fb = heap_caps_malloc(BSP_LCD_H_RES * BSP_LCD_V_RES * sizeof(uint16_t), MALLOC_CAP_SPIRAM);
-    assert(fb);
+    if (!fb) {
+        ESP_LOGE(TAG, "framebuffer alloc failed");
+        return;
+    }
     memset(fb, 0x1F, BSP_LCD_H_RES * BSP_LCD_V_RES * sizeof(uint16_t));
     esp_lcd_panel_draw_bitmap(panel, 0, 0, BSP_LCD_H_RES, BSP_LCD_V_RES, fb);
     heap_caps_free(fb);

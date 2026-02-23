@@ -34,6 +34,18 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if ! git show-ref --verify --quiet refs/remotes/origin/develop; then
+            echo "develop branch does not exist, skipping backmerge"
+            exit 0
+          fi
+
           git checkout develop
-          git merge --no-ff main -m "chore: backmerge main into develop [skip ci]"
+
+          if ! git merge --no-ff main -m "chore: backmerge main into develop [skip ci]"; then
+            echo "Merge conflict detected during backmerge. Aborting and skipping push."
+            git merge --abort
+            exit 1
+          fi
+
           git push

@@ -6,7 +6,7 @@
       "extra-files": [
         {
           "type": "yaml",
-          "path": "idf_component.yml",
+          "path": "pandatouch/idf_component.yml",
           "jsonpath": "$.version"
         }
       ]

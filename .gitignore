@@ -4,6 +4,7 @@ build/
 managed_components/
 dependencies.lock
 sdkconfig
+sdkconfig.old
 .cache/
 *-noglib/
 __pycache__/

@@ -16,5 +16,9 @@ CONFIG_LV_USE_DEMO_BENCHMARK=y
 CONFIG_LV_USE_PERF_MONITOR=y
 CONFIG_LV_USE_SYSMON=y
 
+# Silence lv_demo_benchmark.c #warning (fires when LV_MEM_SIZE < 128 kB)
+# Kconfig unit is kB; LV_MEM_SIZE in C is computed as LV_MEM_SIZE_KILOBYTES * 1024
+CONFIG_LV_MEM_SIZE_KILOBYTES=128
+
 # FreeRTOS tick rate for accurate timing measurements
 CONFIG_FREERTOS_HZ=1000

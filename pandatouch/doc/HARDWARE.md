@@ -1,6 +1,6 @@
 # Hardware Reference: BigTreeTech Panda Touch
 
-The BigTreeTech Panda Touch is an ESP32-S3 based device with a large high-resolution display and USB OTG capabilities.
+The BigTreeTech Panda Touch is an ESP32-S3-based device with a large high-resolution display and USB OTG capabilities.
 
 ## MCU Specifications
 

@@ -18,3 +18,4 @@ dependencies:
 examples:
   - path: ../examples/display_hello
   - path: ../examples/display_demo
+  - path: ../examples/display_lvgl_benchmark

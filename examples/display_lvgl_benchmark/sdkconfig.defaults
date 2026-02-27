@@ -38,5 +38,5 @@ CONFIG_FREERTOS_HZ=1000
 
 # Prevent multi-pass layer rendering artifacts in opa_layer benchmark scenes.
 # LVGL warns when this < 1/20 of screen size (800*480*2 = 768000 / 20 = 38400).
-# Round up to next 1 KB boundary.
-CONFIG_LV_DRAW_LAYER_SIMPLE_BUF_SIZE=39424
+# Next 1 KB boundary above the 38400 minimum: 38 * 1024 = 38912.
+CONFIG_LV_DRAW_LAYER_SIMPLE_BUF_SIZE=38912

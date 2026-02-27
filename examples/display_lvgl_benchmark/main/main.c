@@ -25,8 +25,12 @@ void *lv_malloc_core(size_t size)
 
 void *lv_realloc_core(void *p, size_t new_size)
 {
+    if (new_size == 0) {
+        heap_caps_free(p);
+        return NULL;
+    }
     void *new_p = heap_caps_realloc(p, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!new_p && p) {
+    if (!new_p) {
         new_p = heap_caps_realloc(p, new_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     }
     return new_p;
@@ -46,7 +50,10 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Running LVGL benchmark");
 
-    bsp_display_lock(0);
-    lv_demo_benchmark();
-    bsp_display_unlock();
+    if (bsp_display_lock(0)) {
+        lv_demo_benchmark();
+        bsp_display_unlock();
+    } else {
+        ESP_LOGE(TAG, "Failed to acquire display lock");
+    }
 }

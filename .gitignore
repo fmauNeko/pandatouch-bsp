@@ -6,5 +6,5 @@ dependencies.lock
 sdkconfig
 sdkconfig.old
 .cache/
-*_noglib/
+pandatouch_noglib/
 __pycache__/

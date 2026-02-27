@@ -43,11 +43,43 @@ The device uses a Type-C USB connector for power input, serial debugging, and pr
 | ------- | ----------- | ---------------------- |
 | [display_demo — Panda Touch showcase](https://github.com/fmauneko/pandatouch-bsp/tree/master/examples/display_demo) | Three-tab LVGL UI demonstrating backlight control, USB file browser, and optional AHT30 sensor data. | - |
 | [Hello Panda Touch](https://github.com/fmauneko/pandatouch-bsp/tree/master/examples/display_hello) | Simple "Hello World" example showing a centered label and USB MSC host initialization. | - |
+| [LVGL Benchmark](https://github.com/fmauneko/pandatouch-bsp/tree/master/examples/display_lvgl_benchmark) | Runs the built-in LVGL benchmark suite and prints a performance summary to the serial console. | - |
 
 <!-- END_EXAMPLES -->
 </div>
 
 <!-- START_BENCHMARK -->
+
+# Benchmark for BOARD pandatouch
+
+**DATE:** 27.02.2026 22:47
+
+**LVGL version:** 9.5.0
+
+| Name | Avg. CPU | Avg. FPS | Avg. time | render time | flush time |
+| ---- | :------: | :------: | :-------: | :---------: | :--------: |
+| Empty screen | 85%  | 17  | 51  | 36  | 15  |
+| Moving wallpaper | 99%  | 7  | 127  | 111  | 16  |
+| Single rectangle | 52%  | 28  | 13  | 4  | 9  |
+| Multiple rectangles | 97%  | 19  | 43  | 17  | 26  |
+| Multiple RGB images | 98%  | 12  | 65  | 21  | 44  |
+| Multiple ARGB images | 99%  | 12  | 70  | 38  | 32  |
+| Rotated ARGB images | 99%  | 11  | 73  | 65  | 8  |
+| Multiple labels | 84%  | 15  | 77  | 64  | 13  |
+| Screen sized text | 97%  | 8  | 110  | 101  | 9  |
+| Multiple arcs | 99%  | 25  | 29  | 18  | 11  |
+| Containers | 98%  | 9  | 90  | 76  | 14  |
+| Containers with overlay | 99%  | 7  | 112  | 102  | 10  |
+| Containers with opa | 99%  | 8  | 102  | 91  | 11  |
+| Containers with opa_layer | 99%  | 4  | 177  | 165  | 12  |
+| Containers with scrolling | 99%  | 9  | 98  | 88  | 10  |
+| Widgets demo | 99%  | 5  | 134  | 123  | 11  |
+| All scenes avg. | 93%  | 12  | 85  | 70  | 15  |
+
+***
+
+
+
 <!-- END_BENCHMARK -->
 
 ## License

@@ -27,7 +27,7 @@ def _load_previous_json() -> dict:
         url = f"{BENCHMARK_RELEASES_URL}/benchmark_{BOARD}.json"
         with urllib.request.urlopen(url) as resp:
             return json.load(resp)
-    except (urllib.error.HTTPError, json.JSONDecodeError):
+    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError):
         return {}
 
 
@@ -41,7 +41,7 @@ def _find_previous(prev: dict, name: str) -> dict:
 
 
 def _diff(current: dict, previous: dict, field: str, higher_is_better: bool) -> str:
-    if os.getenv("GITHUB_REF_NAME") == "master":
+    if os.getenv("GITHUB_REF_NAME") == "main":
         return ""
     if not previous or not current.get(field) or not previous.get(field):
         return ""
@@ -73,7 +73,7 @@ def test_lvgl_benchmark(dut: Dut) -> None:
         "board": BOARD,
     }
 
-    if os.getenv("GITHUB_REF_NAME") == "master":
+    if os.getenv("GITHUB_REF_NAME") == "main":
         _write(".md", "## LVGL Benchmark\n\n")
     else:
         _write(".md", f"# Benchmark for BOARD {BOARD}\n\n")
@@ -124,7 +124,7 @@ def test_lvgl_benchmark(dut: Dut) -> None:
         )
 
     _write(".md", "\n")
-    if os.getenv("GITHUB_REF_NAME") != "master":
+    if os.getenv("GITHUB_REF_NAME") != "main":
         _write(".md", "***\n\n")
 
     _write(".json", json.dumps(output, indent=4))

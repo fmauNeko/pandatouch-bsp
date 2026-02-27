@@ -19,7 +19,7 @@ idf.py build flash monitor
 After startup the display will cycle through all LVGL benchmark scenes. Once
 all scenes have run, the serial console prints a summary table:
 
-```
+```text
 Benchmark Summary (9.5.0 )
 Name, Avg. CPU, Avg. FPS, Avg. time, render time, flush time
 Empty screen, ...

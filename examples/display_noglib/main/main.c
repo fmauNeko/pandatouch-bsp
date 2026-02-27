@@ -1,4 +1,11 @@
+/**
+ * @file main.c
+ * @brief display_noglib — raw panel access example
+ * @details Demonstrates direct framebuffer access without LVGL using the pandatouch_noglib component variant.
+ */
+
 #include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_heap_caps.h"

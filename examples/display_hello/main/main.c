@@ -1,4 +1,11 @@
+/**
+ * @file main.c
+ * @brief Hello Panda Touch
+ * @details Simple "Hello World" example showing a centered label and USB MSC host initialization.
+ */
+
 #include "bsp/esp-bsp.h"
+
 #include "esp_log.h"
 
 static void on_usb_mount(void) { ESP_LOGI("app", "USB mounted"); }

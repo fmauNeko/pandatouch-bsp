@@ -6,7 +6,8 @@
 
 /**
  * @file main.c
- * @brief display_demo — comprehensive BSP showcase for the Panda Touch
+ * @brief display_demo — Panda Touch showcase
+ * @details Three-tab LVGL UI demonstrating backlight control, USB file browser, and optional AHT30 sensor data.
  *
  * Three-tab LVGL UI:
  *  - Backlight  : Interactive slider to control PWM backlight brightness

@@ -416,10 +416,12 @@ void *lv_malloc_core(size_t size)
 
 void *lv_realloc_core(void *p, size_t new_size)
 {
+    if (new_size == 0) {
+        heap_caps_free(p);
+        return NULL;
+    }
     void *new_p = heap_caps_realloc(p, new_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!new_p && p) {
-        /* Fallback: try internal RAM if PSRAM realloc failed.
-         * Handles the case where original block was allocated in internal RAM. */
+    if (!new_p) {
         new_p = heap_caps_realloc(p, new_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     }
     return new_p;

@@ -8,3 +8,5 @@ sdkconfig.old
 .cache/
 pandatouch_noglib/
 __pycache__/
+benchmark_pandatouch.md
+benchmark_pandatouch.json

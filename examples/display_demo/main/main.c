@@ -451,7 +451,7 @@ void app_main(void)
         }
     }
 
-    bsp_display_lock(0);
+    bsp_display_lock(portMAX_DELAY);
     ui_create();
     bsp_display_unlock();
 

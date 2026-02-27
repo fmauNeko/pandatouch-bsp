@@ -45,12 +45,6 @@
  */
 #define BSP_CAPS_DISPLAY        1
 #define BSP_CAPS_TOUCH          1
-#define BSP_CAPS_BUTTONS        0
-#define BSP_CAPS_AUDIO          0
-#define BSP_CAPS_AUDIO_SPEAKER  0
-#define BSP_CAPS_AUDIO_MIC      0
-#define BSP_CAPS_SDCARD         0
-#define BSP_CAPS_IMU            0
 #define BSP_CAPS_USB_MSC        1
 /** @} */
 

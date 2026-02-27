@@ -214,6 +214,7 @@ static void msc_app_task(void *arg)
             }
         }
     }
+    vTaskDelete(NULL);
 }
 
 /* =========================================================================
@@ -222,6 +223,7 @@ static void msc_app_task(void *arg)
 
 esp_err_t bsp_usb_start(void)
 {
+    s_usb_host_shutdown = false;
     s_usb_event_queue = xQueueCreate(5, sizeof(usb_msc_evt_t));
     if (!s_usb_event_queue) {
         return ESP_ERR_NO_MEM;
@@ -299,7 +301,6 @@ void bsp_usb_stop(void)
         usb_msc_evt_t stop_evt = { .type = USB_MSC_EVT_STOP, .handle = NULL };
         xQueueSend(s_usb_event_queue, &stop_evt, portMAX_DELAY);
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        vTaskDelete(s_msc_app_task);
         s_msc_app_task = NULL;
     }
 

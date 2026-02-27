@@ -11,10 +11,18 @@ CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
 # LVGL: use Kconfig values, no lv_conf.h needed
 CONFIG_LV_CONF_SKIP=y
 
+# Route LVGL heap to PSRAM so large layer buffers (e.g. opa_layer scenes) never
+# fail to allocate. Without this, lv_draw_layer_alloc_buf() falls back to
+# multi-pass rendering which produces visible frame discontinuities.
+CONFIG_LV_USE_CUSTOM_MALLOC=y
+
 # LVGL benchmark + performance monitoring
 CONFIG_LV_USE_DEMO_BENCHMARK=y
 CONFIG_LV_USE_PERF_MONITOR=y
 CONFIG_LV_USE_SYSMON=y
+
+# Font required by the "Widgets demo" benchmark scene
+CONFIG_LV_FONT_MONTSERRAT_16=y
 
 # Enable LVGL logging so benchmark summary is printed to serial via printf
 # LV_LOG() in lv_demo_benchmark.c is a no-op when LV_USE_LOG=0
@@ -27,3 +35,8 @@ CONFIG_LV_MEM_SIZE_KILOBYTES=128
 
 # FreeRTOS tick rate for accurate timing measurements
 CONFIG_FREERTOS_HZ=1000
+
+# Prevent multi-pass layer rendering artifacts in opa_layer benchmark scenes.
+# LVGL warns when this < 1/20 of screen size (800*480*2 = 768000 / 20 = 38400).
+# Round up to next 1 KB boundary.
+CONFIG_LV_DRAW_LAYER_SIMPLE_BUF_SIZE=39424

@@ -13,6 +13,7 @@ import re
 import argparse
 import subprocess
 import urllib.request
+import urllib.error
 from pathlib import Path
 from idf_component_tools.manager import ManifestManager
 from py_markdown_table.markdown_table import markdown_table
@@ -74,6 +75,7 @@ capability_emojis = {
     "IMU": ":video_game:",
     "HUMITURE": ":thermometer:",
     "USB": ":electric_plug:",
+    "USB_MSC": ":floppy_disk:",
     "BUTTONS": ":radio_button:",
     "LED": ":bulb:",
     "CAMERA": ":camera:",
@@ -162,29 +164,48 @@ def get_capabilities_table(header_path, main_path, manifest):
 
                 # Check for specific driver/controller names in C file
                 additional_info = []
-                if main_path and main_path.exists():
+                c_code = ""
+                if main_path and main_path.is_dir():
+                    for c_file in sorted(main_path.glob("*.c")):
+                        with open(c_file, "r", encoding="utf-8") as cf:
+                            c_code += cf.read() + "\n"
+                elif main_path and main_path.exists():
                     with open(main_path, "r", encoding="utf-8") as cf:
                         c_code = cf.read()
+                if c_code:
+                    # DISPLAY: find all esp_lcd_new_panel_* excluding io_*,
+                    # plus esp_lcd_new_rgb_panel (RGB parallel interface)
+                    if capability == "DISPLAY":
+                        display_matches = re.findall(
+                            r"esp_lcd_new_panel_([a-z0-9_]+)\s*\(", c_code
+                        )
+                        additional_info = [
+                            m for m in display_matches if not m.startswith("io_")
+                        ]
+                        if re.search(r"esp_lcd_new_rgb_panel\s*\(", c_code):
+                            additional_info.append("rgb")
 
-                        # DISPLAY: find all esp_lcd_new_panel_* excluding io_*
-                        if capability == "DISPLAY":
-                            display_matches = re.findall(
-                                r"esp_lcd_new_panel_([a-z0-9_]+)\s*\(", c_code
+                    # TOUCH: esp_lcd_touch_new_i2c_*
+                    if capability == "TOUCH":
+                        additional_info = re.findall(
+                            r"esp_lcd_touch_new_i2c_([a-z0-9_]+)\s*\(", c_code
+                        )
+
+                    # AUDIO_SPEAKER
+                    if capability == "AUDIO_SPEAKER":
+                        speaker_code_section = extract_function_body(
+                            c_code, "bsp_audio_codec_speaker_init"
+                        )
+                        if speaker_code_section is not None:
+                            matches = re.findall(
+                                r"([a-z0-9_]+)_codec_new", speaker_code_section
                             )
                             additional_info = [
-                                m for m in display_matches if not m.startswith("io_")
+                                m for m in matches if not m.startswith("audio")
                             ]
-
-                        # TOUCH: esp_lcd_touch_new_i2c_*
-                        if capability == "TOUCH":
-                            additional_info = re.findall(
-                                r"esp_lcd_touch_new_i2c_([a-z0-9_]+)\s*\(", c_code
-                            )
-
-                        # AUDIO_SPEAKER
-                        if capability == "AUDIO_SPEAKER":
+                        if not additional_info:
                             speaker_code_section = extract_function_body(
-                                c_code, "bsp_audio_codec_speaker_init"
+                                c_code, "bsp_audio_codec_init"
                             )
                             if speaker_code_section is not None:
                                 matches = re.findall(
@@ -193,22 +214,22 @@ def get_capabilities_table(header_path, main_path, manifest):
                                 additional_info = [
                                     m for m in matches if not m.startswith("audio")
                                 ]
-                            if not additional_info:
-                                speaker_code_section = extract_function_body(
-                                    c_code, "bsp_audio_codec_init"
-                                )
-                                if speaker_code_section is not None:
-                                    matches = re.findall(
-                                        r"([a-z0-9_]+)_codec_new", speaker_code_section
-                                    )
-                                    additional_info = [
-                                        m for m in matches if not m.startswith("audio")
-                                    ]
 
-                        # AUDIO_MIC
-                        if capability == "AUDIO_MIC":
+                    # AUDIO_MIC
+                    if capability == "AUDIO_MIC":
+                        mic_code_section = extract_function_body(
+                            c_code, "bsp_audio_codec_microphone_init"
+                        )
+                        if mic_code_section is not None:
+                            matches = re.findall(
+                                r"([a-z0-9_]+)_codec_new", mic_code_section
+                            )
+                            additional_info = [
+                                m for m in matches if not m.startswith("audio")
+                            ]
+                        if not additional_info:
                             mic_code_section = extract_function_body(
-                                c_code, "bsp_audio_codec_microphone_init"
+                                c_code, "bsp_audio_codec_init"
                             )
                             if mic_code_section is not None:
                                 matches = re.findall(
@@ -217,17 +238,6 @@ def get_capabilities_table(header_path, main_path, manifest):
                                 additional_info = [
                                     m for m in matches if not m.startswith("audio")
                                 ]
-                            if not additional_info:
-                                mic_code_section = extract_function_body(
-                                    c_code, "bsp_audio_codec_init"
-                                )
-                                if mic_code_section is not None:
-                                    matches = re.findall(
-                                        r"([a-z0-9_]+)_codec_new", mic_code_section
-                                    )
-                                    additional_info = [
-                                        m for m in matches if not m.startswith("audio")
-                                    ]
 
                 # CAMERA SENSOR
                 if capability == "CAMERA":
@@ -254,22 +264,23 @@ def get_capabilities_table(header_path, main_path, manifest):
                     }
                 )
                 # Special handling of 'DISPLAY' capability, as it often includes esp_lvgl_port component
+                # Only add the LVGL_PORT row if esp_lvgl_port is actually present in the manifest
                 if capability == "DISPLAY" and available:
                     component_versions = map_capability_to_driver("LVGL_PORT", manifest)
-                    components = []
-                    versions = []
-                    if component_versions is not None:
+                    if not component_versions:
+                        pass  # esp_lvgl_port not in manifest (e.g. noglib variant) — skip row
+                    else:
                         components = [c for c, _ in component_versions]
                         versions = [v for _, v in component_versions]
-                    table_data.append(
-                        {
-                            "Available": ":heavy_check_mark:",
-                            "Capability": ":black_circle: " + "LVGL_PORT",
-                            "Controller/Codec": "",
-                            "Component": "<br/>".join(components),
-                            "Version": "<br/>".join(versions),
-                        }
-                    )
+                        table_data.append(
+                            {
+                                "Available": ":heavy_check_mark:",
+                                "Capability": ":black_circle: " + "LVGL_PORT",
+                                "Controller/Codec": "",
+                                "Component": "<br/>".join(components),
+                                "Version": "<br/>".join(versions),
+                            }
+                        )
         return table_data
 
 
@@ -335,12 +346,16 @@ def get_examples_table(bsp_name):
                 base_repo_url = git_url
             else:
                 # Fallback to hardcoded URL for unknown formats
-                base_repo_url = "https://github.com/fmauNeko/pandatouch-bsp"
+                base_repo_url = "https://github.com/fmauneko/pandatouch-bsp"
             # Remove .git suffix if present
             base_repo_url = base_repo_url.replace(".git", "")
+            # Normalize GitHub owner/repo to lowercase
+            parts = base_repo_url.split("https://github.com/", 1)
+            if len(parts) == 2:
+                base_repo_url = "https://github.com/" + parts[1].lower()
         except (subprocess.CalledProcessError, FileNotFoundError):
             # Fallback if git command fails
-            base_repo_url = "https://github.com/fmauNeko/pandatouch-bsp"
+            base_repo_url = "https://github.com/fmauneko/pandatouch-bsp"
 
     rows = []
     for example_dir in sorted(EXAMPLES_DIR.iterdir()):
@@ -360,9 +375,28 @@ def get_examples_table(bsp_name):
                 continue
 
         brief, details, example_ref = extract_metadata_from_c_file(c_file)
-        boards = extract_supported_boards(example_dir)
-        if bsp_name not in boards:
-            continue
+
+        # Check dependencies in idf_component.yml
+        manifest_path = example_dir / "idf_component.yml"
+        if not manifest_path.exists():
+            manifest_path = example_dir / "main" / "idf_component.yml"
+
+        if manifest_path.exists():
+            try:
+                manager = ManifestManager(manifest_path.parent, "project")
+                manifest = manager.load()
+                if bsp_name not in manifest.dependencies:
+                    continue
+            except Exception:
+                # Fallback to simple string check if parsing fails
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    if f"{bsp_name}:" not in f.read():
+                        continue
+        else:
+            # Fallback to marker files
+            boards = extract_supported_boards(example_dir)
+            if bsp_name not in boards:
+                continue
 
         example_folder = example_dir.name
         flash_link = f"[Flash Example]({example_ref})" if example_ref != "" else "-"
@@ -376,22 +410,32 @@ def get_examples_table(bsp_name):
 
 def check_bsp_readme(bsp_path) -> Any:
     # Get list of capabilities and dependencies of this BSP
-    bsp_name = (
-        bsp_path.stem if not bsp_path.stem.endswith("_noglib") else bsp_path.stem[:-7]
+    # bsp_name_full is the actual folder name (e.g. pandatouch or pandatouch_noglib)
+    # bsp_name_base is the base name used for headers (e.g. pandatouch)
+    bsp_name_full = bsp_path.name
+    bsp_name_base = (
+        bsp_name_full if not bsp_name_full.endswith("_noglib") else bsp_name_full[:-7]
     )
-    header_path = bsp_path / "include" / "bsp" / (bsp_name + ".h")
-    main_path = bsp_path / (bsp_name + ".c")
+
+    header_path = bsp_path / "include" / "bsp" / (bsp_name_base + ".h")
+    main_path = bsp_path / (bsp_name_base + ".c")
     readme_path = bsp_path / "README.md"
     manager = ManifestManager(bsp_path, "bsp")
 
     # Some BSPs has main C file in src/ folder
     if not main_path.exists():
-        main_path = bsp_path / "src" / (bsp_name + ".c")
+        main_path = bsp_path / "src" / (bsp_name_base + ".c")
+
+    # If still not found, fall back to the whole src/ directory so all .c files are scanned
+    if not main_path.exists():
+        src_dir = bsp_path / "src"
+        if src_dir.exists() and any(src_dir.glob("*.c")):
+            main_path = src_dir
 
     table_capabilities_data = get_capabilities_table(
         header_path, main_path, manager.load()
     )
-    table_examples_md = get_examples_table(bsp_name)
+    table_examples_md = get_examples_table(bsp_name_full)
 
     # Convert table to markdown format
     try:
@@ -416,12 +460,12 @@ def check_bsp_readme(bsp_path) -> Any:
         if content.strip() != updated_content.strip():
             with open(readme_path, "w", encoding="utf-8") as f:
                 f.write(updated_content.strip())
-            print(f"{bsp_name} README.md capabilities updated")
+            print(f"{bsp_name_full} README.md capabilities updated")
         else:
-            print(f"{bsp_name} README.md capabilities is up to date")
+            print(f"{bsp_name_full} README.md capabilities is up to date")
         content = updated_content  # Use updated content for subsequent sections
     else:
-        print(f"Markers capabilities not in {bsp_name} README.md")
+        print(f"Markers capabilities not in {bsp_name_full} README.md")
 
     # UPDATE EXAMPLES TABLE
     pattern = re.compile(rf"{EXAMPLES_START}.*?{EXAMPLES_END}", re.DOTALL)
@@ -433,12 +477,12 @@ def check_bsp_readme(bsp_path) -> Any:
         if content.strip() != updated_content.strip():
             with open(readme_path, "w", encoding="utf-8") as f:
                 f.write(updated_content.strip())
-            print(f"{bsp_name} README.md examples updated")
+            print(f"{bsp_name_full} README.md examples updated")
             content = updated_content  # Use updated content for subsequent sections
         else:
-            print(f"{bsp_name} README.md examples is up to date")
+            print(f"{bsp_name_full} README.md examples is up to date")
     else:
-        print(f"Markers examples not in {bsp_name} README.md")
+        print(f"Markers examples not in {bsp_name_full} README.md")
 
     if os.getenv("GITHUB_ACTIONS") != "true":
         # UPDATE BENCHMARK TABLE
@@ -446,7 +490,7 @@ def check_bsp_readme(bsp_path) -> Any:
             benchmark_path = (
                 BENCHMARK_RELEASE_URL
                 + "benchmark_"
-                + bsp_name.replace("-", "_")
+                + bsp_name_full.replace("-", "_")
                 + ".md"
             )
             with urllib.request.urlopen(benchmark_path, timeout=10) as response:
@@ -460,16 +504,16 @@ def check_bsp_readme(bsp_path) -> Any:
                 if content.strip() != updated_content.strip():
                     with open(readme_path, "w", encoding="utf-8") as f:
                         f.write(updated_content.strip())
-                    print(f"{bsp_name} README.md benchmark updated")
+                    print(f"{bsp_name_full} README.md benchmark updated")
                 else:
-                    print(f"{bsp_name} README.md benchmark is up to date")
+                    print(f"{bsp_name_full} README.md benchmark is up to date")
             else:
-                print(f"Markers benchmark not in {bsp_name} README.md")
+                print(f"Markers benchmark not in {bsp_name_full} README.md")
         except urllib.error.HTTPError:
-            print(f"Benchmarks for {bsp_name} does not exist")
+            print(f"Benchmarks for {bsp_name_full} does not exist")
         except (urllib.error.URLError, TimeoutError) as e:
             print(
-                f"[WARNING] Could not fetch benchmarks for {bsp_name} (Network/Timeout): {e}"
+                f"[WARNING] Could not fetch benchmarks for {bsp_name_full} (Network/Timeout): {e}"
             )
         except Exception as e:
             print(f"[WARNING] Failed to update benchmarks: {e}")

@@ -1,3 +1,9 @@
+/**
+ * @file main.c
+ * @brief LVGL Benchmark
+ * @details Runs the built-in LVGL benchmark suite and prints a performance summary to the serial console.
+ */
+
 #include "lv_demos.h"
 #include "bsp/esp-bsp.h"
 #include "esp_heap_caps.h"

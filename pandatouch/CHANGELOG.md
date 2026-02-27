@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/fmauNeko/pandatouch-bsp/compare/v0.3.0...v0.3.1) (2026-02-27)
+
+
+### Bug Fixes
+
+* **release:** correct extra-files path, sync version, fix CHANGELOG ([619c7f9](https://github.com/fmauNeko/pandatouch-bsp/commit/619c7f9aa4f918b8100a9ea22d2375d6c8aa0596))
+
 ## [0.3.0](https://github.com/fmauNeko/pandatouch-bsp/releases/tag/v0.3.0) (2026-02-27)
 
 
@@ -35,5 +42,3 @@
 * **pandatouch:** use #ifndef consistently in config.h and add missing includes in bsp_err_check.h ([90edd86](https://github.com/fmauNeko/pandatouch-bsp/commit/90edd8610a8acd78b401e9eb74041ee0eddb2b32))
 * **touch:** pass driver_data to GT911 for I2C address selection ([ddf3af1](https://github.com/fmauNeko/pandatouch-bsp/commit/ddf3af192faa716968bf5a70f3bc8503ef45d15d))
 * **touch:** set scl_speed_hz on GT911 I2C device config ([db06b8e](https://github.com/fmauNeko/pandatouch-bsp/commit/db06b8e8e890dba0434ac477e66439f9ee481c70))
-
-

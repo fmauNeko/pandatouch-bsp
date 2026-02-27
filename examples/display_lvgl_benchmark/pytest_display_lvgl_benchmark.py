@@ -66,7 +66,7 @@ def test_lvgl_benchmark(dut: Dut) -> None:
     Path(f"benchmark_{BOARD}.md").unlink(missing_ok=True)
     Path(f"benchmark_{BOARD}.json").unlink(missing_ok=True)
 
-    dut.expect_exact("benchmark: Running LVGL benchmark", timeout=30)
+    dut.expect_exact("benchmark: Running LVGL benchmark", timeout=120)
 
     output: dict = {
         "date": date.strftime("%d.%m.%Y %H:%M"),

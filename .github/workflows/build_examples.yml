@@ -1,0 +1,83 @@
+name: Build examples
+
+# Compiles all BSP examples on every change to BSP sources, examples, or CI scripts.
+# Order matters: display_hello and display_demo must build before bsp_noglib.py renames pandatouch/ → pandatouch_noglib/.
+
+on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'pandatouch/**'
+      - 'examples/**'
+      - '.github/**'
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'pandatouch/**'
+      - 'examples/**'
+      - '.github/**'
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (IDF ${{ matrix.idf_ver }})
+    runs-on: ubuntu-latest
+    container: espressif/idf:${{ matrix.idf_ver }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        idf_ver:
+          - "release-v6.0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python CI dependencies
+        shell: bash
+        run: |
+          . ${IDF_PATH}/export.sh
+          pip install "idf-component-manager>=2,<3" py-markdown-table --upgrade
+
+      # ── 1. Build the LVGL example (pandatouch/ must still exist) ──────────
+      - name: Build display_hello
+        shell: bash
+        run: |
+          . ${IDF_PATH}/export.sh
+          cd examples/display_hello
+          idf.py build
+
+      # ── 2. Build the comprehensive demo example (pandatouch/ must still exist) ──
+      - name: Build display_demo
+        shell: bash
+        run: |
+          . ${IDF_PATH}/export.sh
+          cd examples/display_demo
+          idf.py build
+
+      # ── 3. Build the LVGL benchmark example (pandatouch/ must still exist) ────
+      - name: Build display_lvgl_benchmark
+        shell: bash
+        run: |
+          . ${IDF_PATH}/export.sh
+          cd examples/display_lvgl_benchmark
+          idf.py build
+
+      # ── 4. Generate pandatouch_noglib (renames pandatouch/ → pandatouch_noglib/) ──
+      - name: Generate pandatouch_noglib
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          . ${IDF_PATH}/export.sh
+          python .github/ci/bsp_noglib.py pandatouch
+
+      # ── 5. Build the no-LVGL example (pandatouch_noglib/ now exists) ───────
+      - name: Build display_noglib
+        shell: bash
+        run: |
+          . ${IDF_PATH}/export.sh
+          cd examples/display_noglib
+          idf.py build

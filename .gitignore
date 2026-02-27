@@ -1,0 +1,12 @@
+.sisyphus/
+
+build/
+managed_components/
+dependencies.lock
+sdkconfig
+sdkconfig.old
+.cache/
+pandatouch_noglib/
+__pycache__/
+benchmark_pandatouch.md
+benchmark_pandatouch.json

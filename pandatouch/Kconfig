@@ -1,0 +1,63 @@
+menu "Board Support Package (Panda Touch)"
+
+    config BSP_ERROR_CHECK
+        bool "Enable error check in BSP"
+        default y
+        help
+            Error check assert the application before returning the error code.
+
+    menu "I2C"
+        config BSP_I2C_NUM
+            int "I2C peripheral index"
+            default 0
+            range 0 1
+            help
+                ESP32S3 has two I2C peripherals, pick the one you want to use.
+
+        config BSP_I2C_FAST_MODE
+            bool "Enable I2C fast mode"
+            default y
+            help
+                I2C has two speed modes: normal (100kHz) and fast (400kHz).
+
+        config BSP_I2C_CLK_SPEED_HZ
+            int
+            default 400000 if BSP_I2C_FAST_MODE
+            default 100000
+    endmenu
+
+    menu "Display"
+        config BSP_DISPLAY_BRIGHTNESS_LEDC_CH
+            int "LEDC channel index for backlight"
+            default 1
+            range 0 7
+            help
+                LEDC channel is used to generate PWM signal that controls display brightness.
+
+        config BSP_LCD_DRAW_BUF_HEIGHT
+            int "LCD framebuf height in lines"
+            default 80
+            range 10 480
+            help
+                Framebuf is used for LVGL rendering output.
+
+        config BSP_LCD_DRAW_BUF_DOUBLE
+            bool "LCD double framebuf"
+            default n
+            help
+                Whether to enable double framebuf for LVGL rendering.
+
+        config BSP_LCD_RGB_BOUNCE_BUF_HEIGHT
+            int "RGB bounce buffer height in lines"
+            default 10
+            range 2 100
+            help
+                Number of scanlines in the internal DRAM bounce buffer used by the
+                RGB panel DMA. The DMA reads from PSRAM into this small SRAM ring
+                and feeds the LCD pixel clock directly, decoupling PSRAM latency
+                from pixel timing. Larger values reduce interrupt frequency at the
+                cost of more internal SRAM. 10 lines (16 KB for 800-wide RGB565)
+                is a good default.
+    endmenu
+
+endmenu

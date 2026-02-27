@@ -1,0 +1,62 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+
+  backmerge:
+    name: Backmerge main into develop
+    if: ${{ success() && needs.release.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    needs: [release]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Backmerge main into develop
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if ! git show-ref --verify --quiet refs/remotes/origin/develop; then
+            echo "develop branch does not exist, skipping backmerge"
+            exit 0
+          fi
+
+          git checkout develop
+
+          if ! git merge --no-ff main -m "chore: backmerge main into develop [skip ci]"; then
+            echo "Merge conflict detected during backmerge. Aborting and skipping push."
+            git merge --abort
+            exit 1
+          fi
+
+          git push
+
+  upload_components:
+    name: Trigger components upload
+    if: ${{ needs.release.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    needs: [release]
+    steps:
+      - name: Trigger upload_component workflows
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: upload-component

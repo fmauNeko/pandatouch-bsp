@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "pandatouch": {
+      "release-type": "simple",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "pandatouch/idf_component.yml",
+          "jsonpath": "$.version"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,27 @@
+name: Update README benchmark section
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python dependencies
+        run: pip install "idf-component-manager>=2,<3" py-markdown-table --upgrade
+
+      - name: Update pandatouch README with latest benchmark
+        run: GITHUB_ACTIONS="" python .github/ci/update_readme_dependencies.py pandatouch
+
+      - name: Commit updated README
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pandatouch/README.md
+          git diff --cached --quiet || git commit -m "docs(pandatouch): update benchmark results in README"
+          git push

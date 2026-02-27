@@ -55,6 +55,7 @@ static msc_host_vfs_handle_t     s_vfs_handle              = NULL;
 static TaskHandle_t              s_usb_host_task            = NULL;
 static TaskHandle_t              s_msc_app_task             = NULL;
 static TaskHandle_t              s_msc_evt_handler_task     = NULL;
+static TaskHandle_t              s_usb_notify_target        = NULL;
 static QueueHandle_t             s_usb_event_queue          = NULL;
 
 /* -------------------------------------------------------------------------
@@ -142,7 +143,7 @@ static esp_err_t start_msc_evt_handler_task(void)
  * -------------------------------------------------------------------------*/
 static void msc_app_task(void *arg)
 {
-    TaskHandle_t caller = (TaskHandle_t)arg;
+    (void)arg;
     usb_msc_evt_t evt;
 
     while (xQueueReceive(s_usb_event_queue, &evt, portMAX_DELAY)) {
@@ -199,8 +200,9 @@ static void msc_app_task(void *arg)
             }
 
             if (evt.type == USB_MSC_EVT_STOP) {
-                if (caller) {
-                    xTaskNotifyGive(caller);
+                if (s_usb_notify_target) {
+                    xTaskNotifyGive(s_usb_notify_target);
+                    s_usb_notify_target = NULL;
                 }
                 break;
             }
@@ -274,9 +276,8 @@ esp_err_t bsp_usb_start(void)
         return ret;
     }
 
-    /* 5. Start app task that processes device connect/disconnect events.
-     *    Pass our own task handle so msc_app_task can notify us on STOP. */
-    if (xTaskCreate(msc_app_task, "msc_app", 4096, (void *)xTaskGetCurrentTaskHandle(),
+    /* 5. Start app task that processes device connect/disconnect events. */
+    if (xTaskCreate(msc_app_task, "msc_app", 4096, NULL,
                     5, &s_msc_app_task) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to create MSC app task");
         vTaskDelete(s_msc_evt_handler_task);
@@ -298,6 +299,7 @@ void bsp_usb_stop(void)
     /* Signal msc_app_task to perform its own cleanup and exit.
      * It unmounts/uninstalls the device (avoiding a double-free) then notifies us. */
     if (s_msc_app_task && s_usb_event_queue) {
+        s_usb_notify_target = xTaskGetCurrentTaskHandle();
         usb_msc_evt_t stop_evt = { .type = USB_MSC_EVT_STOP, .handle = NULL };
         xQueueSend(s_usb_event_queue, &stop_evt, portMAX_DELAY);
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);

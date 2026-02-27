@@ -401,7 +401,7 @@ def get_examples_table(bsp_name):
         example_folder = example_dir.name
         flash_link = f"[Flash Example]({example_ref})" if example_ref != "" else "-"
         example_name = brief.split("BSP ")[-1]
-        row = f"| [{example_name}]({base_repo_url}/tree/master/examples/{example_folder}) | {details} | {flash_link} |"
+        row = f"| [{example_name}]({base_repo_url}/tree/main/examples/{example_folder}) | {details} | {flash_link} |"
         rows.append(row)
 
     active_table = "\n".join([EXAMPLES_TABLE_HEADER] + rows)
@@ -444,8 +444,9 @@ def check_bsp_readme(bsp_path) -> Any:
             .set_params(row_sep="markdown", quote=False)
             .get_markdown()
         )
-    except Exception:
-        return
+    except Exception as e:
+        print(f"[Error] Failed to generate capabilities table: {e}")
+        raise
 
     with open(readme_path, "r", encoding="utf-8") as f:
         content = f.read()

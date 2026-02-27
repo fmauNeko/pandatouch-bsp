@@ -16,6 +16,11 @@ CONFIG_LV_USE_DEMO_BENCHMARK=y
 CONFIG_LV_USE_PERF_MONITOR=y
 CONFIG_LV_USE_SYSMON=y
 
+# Enable LVGL logging so benchmark summary is printed to serial via printf
+# LV_LOG() in lv_demo_benchmark.c is a no-op when LV_USE_LOG=0
+CONFIG_LV_USE_LOG=y
+CONFIG_LV_LOG_PRINTF=y
+
 # Silence lv_demo_benchmark.c #warning (fires when LV_MEM_SIZE < 128 kB)
 # Kconfig unit is kB; LV_MEM_SIZE in C is computed as LV_MEM_SIZE_KILOBYTES * 1024
 CONFIG_LV_MEM_SIZE_KILOBYTES=128

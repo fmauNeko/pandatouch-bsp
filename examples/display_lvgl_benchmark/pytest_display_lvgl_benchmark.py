@@ -59,6 +59,7 @@ def _diff(current: dict, previous: dict, field: str, higher_is_better: bool) -> 
 
 
 @pytest.mark.pandatouch
+@pytest.mark.parametrize("target", ["esp32s3"])
 def test_lvgl_benchmark(dut: Dut) -> None:
     date = datetime.datetime.now()
 

@@ -79,6 +79,9 @@ esp_err_t bsp_display_new(const bsp_display_config_t *config,
                            esp_lcd_panel_handle_t     *ret_panel,
                            esp_lcd_panel_io_handle_t  *ret_io)
 {
+    if (!ret_panel) {
+        return ESP_ERR_INVALID_ARG;
+    }
     if (ret_io) {
         *ret_io = NULL;
     }
@@ -211,6 +214,11 @@ lv_display_t *bsp_display_start_with_config(const bsp_display_cfg_t *cfg)
     };
 
     s_display = lvgl_port_add_disp_rgb(&disp_cfg, &rgb_cfg);
+
+    if (!s_display) {
+        ESP_LOGW(TAG, "Display creation failed — skipping touch init");
+        return NULL;
+    }
 
     /* Initialize touch input device */
     if (bsp_display_indev_init(s_display) != ESP_OK) {

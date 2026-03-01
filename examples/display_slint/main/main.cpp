@@ -12,7 +12,6 @@
 
 #include <slint-esp.h>
 #include <slint.h>
-#include <span>
 #include <optional>
 #include <string>
 #include <vector>
@@ -24,8 +23,6 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "driver/i2c_master.h"
-#include "esp_lcd_panel_rgb.h"
-
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
 #include "bsp/touch.h"
@@ -179,20 +176,10 @@ extern "C" void app_main(void)
     bsp_touch_config_t touch_cfg = {};
     ESP_ERROR_CHECK(bsp_touch_new(&touch_cfg, &touch_handle));
 
-    void *buf1 = nullptr;
-    void *buf2 = nullptr;
-    ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(panel_handle, 2, &buf1, &buf2));
-
-    size_t fb_size = BSP_LCD_H_RES * BSP_LCD_V_RES;
     SlintPlatformConfiguration config{
         .size = slint::PhysicalSize({BSP_LCD_H_RES, BSP_LCD_V_RES}),
         .panel_handle = panel_handle,
         .touch_handle = touch_handle,
-        .buffer1 = std::span<slint::platform::Rgb565Pixel>(
-            static_cast<slint::platform::Rgb565Pixel *>(buf1), fb_size),
-        .buffer2 = std::span<slint::platform::Rgb565Pixel>(
-            static_cast<slint::platform::Rgb565Pixel *>(buf2), fb_size),
-        .rotation = slint::platform::SoftwareRenderer::RenderingRotation::NoRotation,
         .byte_swap = false,
     };
     slint_esp_init(config);

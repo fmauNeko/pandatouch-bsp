@@ -284,15 +284,15 @@ static void sleep_test_task(void *arg)
     (void)arg;
 
     ESP_LOGI(TAG, "Entering display sleep for %d seconds", SLEEP_TEST_SECONDS);
-    bsp_display_enter_sleep();
+    ESP_ERROR_CHECK(bsp_display_enter_sleep());
 
     vTaskDelay(pdMS_TO_TICKS(SLEEP_TEST_SECONDS * 1000));
 
     ESP_LOGI(TAG, "Exiting display sleep");
-    bsp_display_exit_sleep();
+    ESP_ERROR_CHECK(bsp_display_exit_sleep());
     bsp_display_brightness_set(80);
 
-    bsp_display_lock(portMAX_DELAY);
+    bsp_display_lock(0);
     lv_label_set_text(s_sleep_label, "Awake!  Sleep test passed.");
     lv_obj_remove_flag(s_sleep_btn, LV_OBJ_FLAG_HIDDEN);
     bsp_display_unlock();

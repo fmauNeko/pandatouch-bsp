@@ -261,15 +261,17 @@ void bsp_display_rotate(lv_display_t *disp, lv_disp_rotation_t rotation)
 
 esp_err_t bsp_display_enter_sleep(void)
 {
-    if (s_display_sleeping) {
-        return ESP_OK;
-    }
-    if (!s_panel_handle) {
+    if (!s_panel_handle || !s_display) {
         return ESP_ERR_INVALID_STATE;
     }
 
     if (!bsp_display_lock(0)) {
         return ESP_ERR_TIMEOUT;
+    }
+
+    if (s_display_sleeping) {
+        bsp_display_unlock();
+        return ESP_OK;
     }
 
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_display);
@@ -279,7 +281,10 @@ esp_err_t bsp_display_enter_sleep(void)
 
     void *fb0 = NULL;
     void *fb1 = NULL;
-    esp_lcd_rgb_panel_get_frame_buffer(s_panel_handle, 2, &fb0, &fb1);
+    esp_err_t fb_err = esp_lcd_rgb_panel_get_frame_buffer(s_panel_handle, 2, &fb0, &fb1);
+    if (fb_err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to get frame buffer: %s", esp_err_to_name(fb_err));
+    }
     if (fb0) {
         memset(fb0, 0, BSP_LCD_H_RES * BSP_LCD_V_RES * sizeof(uint16_t));
     }
@@ -298,14 +303,19 @@ esp_err_t bsp_display_enter_sleep(void)
 
 esp_err_t bsp_display_exit_sleep(void)
 {
-    if (!s_display_sleeping) {
-        return ESP_OK;
+    if (!s_display) {
+        return ESP_ERR_INVALID_STATE;
     }
 
     BSP_ERROR_CHECK_RETURN_ERR(bsp_display_backlight_on());
 
     if (!bsp_display_lock(0)) {
         return ESP_ERR_TIMEOUT;
+    }
+
+    if (!s_display_sleeping) {
+        bsp_display_unlock();
+        return ESP_OK;
     }
 
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_display);

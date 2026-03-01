@@ -2,13 +2,14 @@
 
 Comprehensive BSP showcase for the BigTreeTech Panda Touch.
 
-Three-tab LVGL UI demonstrating all hardware capabilities:
+Four-tab LVGL UI demonstrating all hardware capabilities:
 
 | Tab | Feature |
 |-----|---------|
 | Backlight | Slider to set PWM brightness (1–100%) |
 | USB | File browser — lists files and directories from an inserted USB drive |
 | Sensor | Live temperature & humidity from the optional Panda Sense AHT30 module |
+| Sleep | One-button test of display sleep / wake (3-second cycle) |
 
 The AHT30 sensor is optional. If not connected the Sensor tab shows a "not connected" message.
 

@@ -7,13 +7,14 @@
 /**
  * @file main.c
  * @brief display_demo — Panda Touch showcase
- * @details Three-tab LVGL UI demonstrating backlight control, USB file browser, and optional AHT30 sensor data.
+ * @details Four-tab LVGL UI demonstrating backlight control, USB file browser, optional AHT30 sensor data, and display sleep/wake.
  *
- * Three-tab LVGL UI:
+ * Four-tab LVGL UI:
  *  - Backlight  : Interactive slider to control PWM backlight brightness
  *  - USB        : File browser — lists files/directories from an inserted USB drive
  *  - Sensor     : Live temperature & humidity from the optional Panda Sense (AHT30)
  *                 Gracefully shows "not connected" when the module is absent
+ *  - Sleep      : One-button test of bsp_display_enter_sleep / bsp_display_exit_sleep
  *
  * Threading model:
  *  - LVGL task (no affinity): drives lv_timer_handler; never blocks on I/O
@@ -76,6 +77,8 @@ static lv_obj_t *s_usb_list         = NULL;
 static lv_obj_t *s_usb_status       = NULL;
 static lv_obj_t *s_temp_label       = NULL;
 static lv_obj_t *s_hum_label        = NULL;
+static lv_obj_t *s_sleep_btn        = NULL;
+static lv_obj_t *s_sleep_label      = NULL;
 
 /* ── Colour palette ─────────────────────────────────────────────────────── */
 #define COL_BG        lv_color_hex(0x1a1a2e)
@@ -269,6 +272,61 @@ static void sensor_timer_cb(lv_timer_t *t)
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
+ *  Sleep test
+ *  The actual sleep/wake cycle runs in a dedicated FreeRTOS task so the
+ *  LVGL thread is not blocked.  The task disables the button, sleeps 3 s,
+ *  wakes, and re-enables the button.
+ * ════════════════════════════════════════════════════════════════════════════ */
+#define SLEEP_TEST_SECONDS 3
+
+static void sleep_test_task(void *arg)
+{
+    (void)arg;
+
+    ESP_LOGI(TAG, "Entering display sleep for %d seconds", SLEEP_TEST_SECONDS);
+    esp_err_t err = bsp_display_enter_sleep();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "bsp_display_enter_sleep failed: %s", esp_err_to_name(err));
+        goto done;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(SLEEP_TEST_SECONDS * 1000));
+
+    ESP_LOGI(TAG, "Exiting display sleep");
+    err = bsp_display_exit_sleep();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "bsp_display_exit_sleep failed: %s", esp_err_to_name(err));
+    }
+    bsp_display_brightness_set(80);
+
+done:
+    if (bsp_display_lock(0)) {
+        lv_label_set_text(s_sleep_label,
+                          err == ESP_OK ? "Awake!  Sleep test passed."
+                                       : "Sleep test failed!");
+        lv_obj_remove_flag(s_sleep_btn, LV_OBJ_FLAG_HIDDEN);
+        bsp_display_unlock();
+    }
+
+    vTaskDelete(NULL);
+}
+
+static void sleep_btn_cb(lv_event_t *e)
+{
+    (void)e;
+    lv_obj_add_flag(s_sleep_btn, LV_OBJ_FLAG_HIDDEN);
+    lv_label_set_text(s_sleep_label,
+                      LV_SYMBOL_EYE_CLOSE "  Sleeping for 3 s ...");
+
+    BaseType_t rc = xTaskCreatePinnedToCore(sleep_test_task, "sleep_test", 4096, NULL, 3, NULL, 0);
+    if (rc != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create sleep_test task");
+        lv_label_set_text(s_sleep_label, "Sleep unavailable");
+        lv_obj_remove_flag(s_sleep_btn, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
  *  UI builder
  *  Must be called inside bsp_display_lock() / bsp_display_unlock().
  * ════════════════════════════════════════════════════════════════════════════ */
@@ -292,13 +350,13 @@ static void ui_create(void)
     lv_obj_set_style_text_color(tab_bar, COL_TEXT, 0);
     lv_obj_set_style_text_font(tab_bar, &lv_font_montserrat_18, 0);
 
-    lv_obj_t *tab_bl  = lv_tabview_add_tab(tv, LV_SYMBOL_IMAGE  " Backlight");
-    lv_obj_t *tab_usb = lv_tabview_add_tab(tv, LV_SYMBOL_USB    " USB");
-    lv_obj_t *tab_sen = lv_tabview_add_tab(tv, LV_SYMBOL_CHARGE " Sensor");
+    lv_obj_t *tab_bl    = lv_tabview_add_tab(tv, LV_SYMBOL_IMAGE     " Backlight");
+    lv_obj_t *tab_usb   = lv_tabview_add_tab(tv, LV_SYMBOL_USB       " USB");
+    lv_obj_t *tab_sen   = lv_tabview_add_tab(tv, LV_SYMBOL_CHARGE    " Sensor");
+    lv_obj_t *tab_sleep = lv_tabview_add_tab(tv, LV_SYMBOL_EYE_CLOSE " Sleep");
 
-    /* Common tab content style */
-    lv_obj_t *tabs[] = {tab_bl, tab_usb, tab_sen};
-    for (int i = 0; i < 3; i++) {
+    lv_obj_t *tabs[] = {tab_bl, tab_usb, tab_sen, tab_sleep};
+    for (int i = 0; i < 4; i++) {
         lv_obj_set_style_bg_color(tabs[i], COL_BG, 0);
         lv_obj_set_style_bg_opa(tabs[i], LV_OPA_COVER, 0);
         lv_obj_set_style_pad_all(tabs[i], 20, 0);
@@ -390,6 +448,31 @@ static void ui_create(void)
         lv_obj_set_style_text_color(msg, COL_MUTED, 0);
         lv_obj_set_style_text_font(msg, &lv_font_montserrat_18, 0);
     }
+
+    /* ── Tab 4: Sleep ──────────────────────────────────────────────────────── */
+    lv_obj_set_flex_flow(tab_sleep, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(tab_sleep, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(tab_sleep, 28, 0);
+
+    lv_obj_t *sleep_title = lv_label_create(tab_sleep);
+    lv_label_set_text(sleep_title, "Display Sleep Test");
+    lv_obj_set_style_text_font(sleep_title, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_color(sleep_title, COL_MUTED, 0);
+
+    s_sleep_btn = lv_btn_create(tab_sleep);
+    lv_obj_set_size(s_sleep_btn, 280, 64);
+    lv_obj_set_style_bg_color(s_sleep_btn, COL_ACCENT, 0);
+
+    lv_obj_t *btn_lbl = lv_label_create(s_sleep_btn);
+    lv_label_set_text(btn_lbl, LV_SYMBOL_EYE_CLOSE "  Sleep 3 s");
+    lv_obj_set_style_text_font(btn_lbl, &lv_font_montserrat_18, 0);
+    lv_obj_center(btn_lbl);
+    lv_obj_add_event_cb(s_sleep_btn, sleep_btn_cb, LV_EVENT_CLICKED, NULL);
+
+    s_sleep_label = lv_label_create(tab_sleep);
+    lv_label_set_text(s_sleep_label, "Press the button to test sleep / wake");
+    lv_obj_set_style_text_font(s_sleep_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(s_sleep_label, COL_MUTED, 0);
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

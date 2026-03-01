@@ -3,6 +3,7 @@
  *
  * SPDX-License-Identifier: MIT
  */
+#include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/ledc.h"
@@ -151,9 +152,10 @@ esp_err_t bsp_display_new(const bsp_display_config_t *config,
 }
 
 #if (BSP_CONFIG_NO_GRAPHIC_LIB == 0)
-static esp_lcd_panel_handle_t s_panel_handle = NULL;
-static lv_display_t          *s_display      = NULL;
-static lv_indev_t            *s_touch_indev  = NULL;
+static esp_lcd_panel_handle_t s_panel_handle    = NULL;
+static lv_display_t          *s_display         = NULL;
+static lv_indev_t            *s_touch_indev     = NULL;
+static bool                   s_display_sleeping = false;
 
 lv_display_t *bsp_display_start(void)
 {
@@ -259,6 +261,41 @@ void bsp_display_rotate(lv_display_t *disp, lv_disp_rotation_t rotation)
 
 esp_err_t bsp_display_enter_sleep(void)
 {
+    if (!s_panel_handle || !s_display) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (!bsp_display_lock(0)) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    if (s_display_sleeping) {
+        bsp_display_unlock();
+        return ESP_OK;
+    }
+
+    lv_timer_t *refr_timer = lv_display_get_refr_timer(s_display);
+    if (refr_timer) {
+        lv_timer_pause(refr_timer);
+    }
+
+    void *fb0 = NULL;
+    void *fb1 = NULL;
+    esp_err_t fb_err = esp_lcd_rgb_panel_get_frame_buffer(s_panel_handle, 2, &fb0, &fb1);
+    if (fb_err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to get frame buffer: %s", esp_err_to_name(fb_err));
+    }
+    if (fb0) {
+        memset(fb0, 0, BSP_LCD_H_RES * BSP_LCD_V_RES * sizeof(uint16_t));
+    }
+    if (fb1) {
+        memset(fb1, 0, BSP_LCD_H_RES * BSP_LCD_V_RES * sizeof(uint16_t));
+    }
+
+    s_display_sleeping = true;
+
+    bsp_display_unlock();
+
     BSP_ERROR_CHECK_RETURN_ERR(bsp_display_backlight_off());
 
     return ESP_OK;
@@ -266,8 +303,32 @@ esp_err_t bsp_display_enter_sleep(void)
 
 esp_err_t bsp_display_exit_sleep(void)
 {
+    if (!s_display) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
     BSP_ERROR_CHECK_RETURN_ERR(bsp_display_backlight_on());
-    
+
+    if (!bsp_display_lock(0)) {
+        return ESP_ERR_TIMEOUT;
+    }
+
+    if (!s_display_sleeping) {
+        bsp_display_unlock();
+        return ESP_OK;
+    }
+
+    lv_timer_t *refr_timer = lv_display_get_refr_timer(s_display);
+    if (refr_timer) {
+        lv_timer_resume(refr_timer);
+    }
+
+    lv_obj_invalidate(lv_display_get_screen_active(s_display));
+
+    s_display_sleeping = false;
+
+    bsp_display_unlock();
+
     return ESP_OK;
 }
 #endif // BSP_CONFIG_NO_GRAPHIC_LIB == 0

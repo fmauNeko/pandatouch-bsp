@@ -1,0 +1,7 @@
+dependencies:
+  pandatouch_noglib:
+    path: "../../../pandatouch_noglib"
+  slint/slint:
+    version: "^1.15"
+  espressif/aht30:
+    version: "^1.0.0"

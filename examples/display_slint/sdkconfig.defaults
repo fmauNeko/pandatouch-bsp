@@ -1,0 +1,28 @@
+# CPU
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# PSRAM — 8 MB Octal
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+
+# Flash — 16 MB QIO
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+
+# Cache — required for RGB LCD DMA
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
+
+# FreeRTOS — Slint needs 1ms tick
+CONFIG_FREERTOS_HZ=1000
+# Slint's SoftwareRenderer + TabWidget require ~100KB+ stack on the main task.
+# Smaller values (8KB, 32KB) cause stack overflow in render_buffer_impl.
+# 150KB matches the proven ptouch-ng configuration for this hardware.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=150000
+
+# Compiler optimization
+CONFIG_COMPILER_OPTIMIZATION_PERF=y

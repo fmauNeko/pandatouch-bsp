@@ -11,6 +11,7 @@ import os
 import shutil
 import sys
 import argparse
+import yaml
 from pathlib import Path
 from idf_component_tools.manager import ManifestManager
 from update_readme_dependencies import check_bsp_readme
@@ -71,13 +72,63 @@ def remove_esp_lvgl_port(bsp_path):
     return 0
 
 
-def remove_examples(bsp_path):
+def update_examples(bsp_path):
     manager = ManifestManager(bsp_path, "bsp")
-    try:
-        del manager.manifest.examples
-    except (AttributeError, KeyError):
-        print("{}: no examples section found".format(str(bsp_path)))
+    bsp_name = bsp_path.name
+
+    examples_dir = bsp_path.parent / "examples"
+
+    if not examples_dir.exists():
+        print(
+            "{}: examples directory not found at {}".format(
+                str(bsp_path), str(examples_dir)
+            )
+        )
         return 0
+
+    compatible_examples = []
+
+    for example_dir in sorted(examples_dir.iterdir()):
+        if not example_dir.is_dir():
+            continue
+
+        manifest_path = example_dir / "main" / "idf_component.yml"
+        if not manifest_path.exists():
+            print(
+                "{}: skipping {} (no main/idf_component.yml)".format(
+                    str(bsp_path), example_dir.name
+                )
+            )
+            continue
+
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                example_manifest = yaml.safe_load(f) or {}
+
+            dependencies = example_manifest.get("dependencies", {})
+
+            if bsp_name in dependencies:
+                relative_path = "../examples/{}".format(example_dir.name)
+                compatible_examples.append({"path": relative_path})
+                print(
+                    "{}: found compatible example: {}".format(
+                        str(bsp_path), example_dir.name
+                    )
+                )
+        except (yaml.YAMLError, IOError, OSError) as e:
+            print(
+                "{}: error parsing {}: {}".format(str(bsp_path), manifest_path, str(e))
+            )
+            continue
+
+    if compatible_examples:
+        manager.manifest.examples = compatible_examples
+    else:
+        try:
+            del manager.manifest.examples
+        except (AttributeError, KeyError):
+            pass
+
     manager.dump()
     return 0
 
@@ -128,11 +179,11 @@ def bsp_no_glib_all(bsp_names):
         # 2. Modify the configuration, dependencies and README
         ret += select_bsp_config_no_graphic_lib(bsp_path)
         ret += remove_esp_lvgl_port(bsp_path)
-        ret += remove_examples(bsp_path)
+        ret += update_examples(bsp_path)
         ret += add_notice_to_readme(bsp_path)
         try:
             check_bsp_readme(bsp_path)
-        except Exception as e:
+        except (ValueError, IOError, OSError) as e:
             # README.md was modified by the noglib generation, which is expected here
             print(f"[DEBUG] check_bsp_readme: {type(e).__name__}: {e}")
     return ret

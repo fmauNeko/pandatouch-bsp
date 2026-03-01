@@ -367,11 +367,13 @@ def get_examples_table(bsp_name):
 
         c_file = next(example_dir.glob("main/main.c"), None)
         if not c_file:
-            c_files = list(example_dir.rglob("*.c"))
+            c_file = next(example_dir.glob("main/main.cpp"), None)
+        if not c_file:
+            c_files = list(example_dir.rglob("*.c")) + list(example_dir.rglob("*.cpp"))
             if c_files:
                 c_file = c_files[0]
             else:
-                print(f"No .c file found in {example_dir}")
+                print(f"No .c/.cpp file found in {example_dir}")
                 continue
 
         brief, details, example_ref = extract_metadata_from_c_file(c_file)

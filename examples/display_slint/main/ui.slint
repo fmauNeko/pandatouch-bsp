@@ -79,26 +79,30 @@ export component AppWindow inherits Window {
                 spacing: 16px;
                 padding: 24px;
 
-                if root.sensor-connected : Text {
+                Text {
+                    visible: root.sensor-connected;
                     text: "Panda Sense - AHT30";
                     font-size: 20px;
                     font-weight: 700;
                     horizontal-alignment: center;
                 }
 
-                if root.sensor-connected : Text {
+                Text {
+                    visible: root.sensor-connected;
                     text: root.temperature;
                     font-size: 32px;
                     horizontal-alignment: center;
                 }
 
-                if root.sensor-connected : Text {
+                Text {
+                    visible: root.sensor-connected;
                     text: root.humidity;
                     font-size: 32px;
                     horizontal-alignment: center;
                 }
 
-                if !root.sensor-connected : Text {
+                Text {
+                    visible: !root.sensor-connected;
                     text: "Sensor not connected\n\nAttach the Panda Sense module\nto the I2C1 header (GPIO 3 / 4)";
                     font-size: 16px;
                     horizontal-alignment: center;

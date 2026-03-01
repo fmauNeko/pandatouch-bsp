@@ -162,19 +162,14 @@ static void on_usb_unmount(void)
 
 extern "C" void app_main(void)
 {
-    ESP_ERROR_CHECK(bsp_i2c_init());
-
     esp_lcd_panel_handle_t panel_handle = nullptr;
     esp_lcd_panel_io_handle_t io_handle = nullptr;
-    bsp_display_config_t disp_cfg = {};
-    ESP_ERROR_CHECK(bsp_display_new(&disp_cfg, &panel_handle, &io_handle));
+    ESP_ERROR_CHECK(bsp_display_new(nullptr, &panel_handle, &io_handle));
 
-    ESP_ERROR_CHECK(bsp_display_brightness_init());
     ESP_ERROR_CHECK(bsp_display_backlight_on());
 
     esp_lcd_touch_handle_t touch_handle = nullptr;
-    bsp_touch_config_t touch_cfg = {};
-    ESP_ERROR_CHECK(bsp_touch_new(&touch_cfg, &touch_handle));
+    ESP_ERROR_CHECK(bsp_touch_new(nullptr, &touch_handle));
 
     SlintPlatformConfiguration config{
         .size = slint::PhysicalSize({BSP_LCD_H_RES, BSP_LCD_V_RES}),

@@ -1,0 +1,9 @@
+dependencies:
+  pandatouch_noglib:
+    path: "../../../pandatouch_noglib"
+  slint:
+    git: https://github.com/slint-ui/slint.git
+    path: api/cpp/esp-idf/slint
+    version: "*"
+  espressif/aht30:
+    version: "^1.0.0"

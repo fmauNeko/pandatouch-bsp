@@ -1,0 +1,109 @@
+import { TabWidget, Slider, StandardListView, StandardListViewItem, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    preferred-width: 800px;
+    preferred-height: 480px;
+
+    // Properties for C++ binding
+    in-out property <int> brightness: 80;
+    callback brightness-changed(int);
+    in property <[StandardListViewItem]> usb-files;
+    in property <string> usb-status: "No USB Device";
+    in property <string> temperature: "--.- °C";
+    in property <string> humidity: "--.- %";
+    in property <bool> sensor-connected: false;
+
+    TabWidget {
+        // Tab 1: Backlight control
+        Tab {
+            title: "Backlight";
+            VerticalBox {
+                alignment: center;
+                spacing: 16px;
+                padding: 24px;
+
+                Text {
+                    text: "Screen Brightness";
+                    font-size: 20px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                }
+
+                Slider {
+                    minimum: 1;
+                    maximum: 100;
+                    value <=> root.brightness;
+                    changed(val) => { root.brightness-changed(val); }
+                }
+
+                Text {
+                    text: root.brightness + "%";
+                    font-size: 16px;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        // Tab 2: USB Drive file listing
+        Tab {
+            title: "USB";
+            VerticalBox {
+                alignment: start;
+                spacing: 12px;
+                padding: 24px;
+
+                Text {
+                    text: "USB Drive Contents";
+                    font-size: 20px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: root.usb-status;
+                    font-size: 14px;
+                    horizontal-alignment: center;
+                }
+
+                StandardListView {
+                    model: root.usb-files;
+                }
+            }
+        }
+
+        // Tab 3: Sensor data
+        Tab {
+            title: "Sensor";
+            VerticalBox {
+                alignment: center;
+                spacing: 16px;
+                padding: 24px;
+
+                if root.sensor-connected : Text {
+                    text: "Panda Sense - AHT30";
+                    font-size: 20px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                }
+
+                if root.sensor-connected : Text {
+                    text: root.temperature;
+                    font-size: 32px;
+                    horizontal-alignment: center;
+                }
+
+                if root.sensor-connected : Text {
+                    text: root.humidity;
+                    font-size: 32px;
+                    horizontal-alignment: center;
+                }
+
+                if !root.sensor-connected : Text {
+                    text: "Sensor not connected\n\nAttach the Panda Sense module\nto the I2C1 header (GPIO 3 / 4)";
+                    font-size: 16px;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}

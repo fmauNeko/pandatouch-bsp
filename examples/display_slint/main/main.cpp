@@ -1,3 +1,15 @@
+/*
+ * SPDX-FileCopyrightText: 2026 fmauNeko
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+/**
+ * @file main.cpp
+ * @brief display_slint — Panda Touch Slint UI example
+ * @details Three-tab Slint UI demonstrating backlight control, USB file browser, and optional AHT30 sensor data.
+ */
+
 #include <slint-esp.h>
 #include <slint.h>
 #include <span>
@@ -77,8 +89,8 @@ static void sensor_task(void *arg)
             if (auto ui = weak_ui_ptr->lock()) {
                 ui->set_sensor_connected(ok);
                 if (ok) {
-                    ui->set_temperature(slint::SharedString(temp_str));
-                    ui->set_humidity(slint::SharedString(hum_str));
+                    ui->set_temperature(slint::SharedString(temp_str.c_str()));
+                    ui->set_humidity(slint::SharedString(hum_str.c_str()));
                 }
             }
         });
@@ -109,7 +121,7 @@ static void usb_update(const slint::ComponentWeakHandle<AppWindow> &weak_ui)
                     continue;
                 }
                 std::string prefix = (ent->d_type == DT_DIR) ? "[D] " : "[F] ";
-                files.push_back(slint::SharedString(prefix + ent->d_name));
+                files.push_back(slint::SharedString((prefix + ent->d_name).c_str()));
             }
             closedir(dir);
         }
@@ -126,7 +138,7 @@ static void usb_update(const slint::ComponentWeakHandle<AppWindow> &weak_ui)
                 model->push_back(slint::StandardListViewItem{f});
             }
             ui->set_usb_files(model);
-            ui->set_usb_status(slint::SharedString(status_str));
+            ui->set_usb_status(slint::SharedString(status_str.c_str()));
         }
     });
 }
@@ -180,8 +192,8 @@ extern "C" void app_main(void)
     slint_esp_init(config);
 
     auto ui = AppWindow::create();
-    ui->on_brightness_changed([](int value) {
-        bsp_display_brightness_set(value);
+    ui->on_brightness_changed([](float value) {
+        bsp_display_brightness_set(static_cast<int>(value));
     });
     ui->set_brightness(80);
     bsp_display_brightness_set(80);

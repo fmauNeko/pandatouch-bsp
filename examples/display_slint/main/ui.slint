@@ -1,12 +1,12 @@
-import { TabWidget, Slider, StandardListView, StandardListViewItem, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { TabWidget, Slider, StandardListView, VerticalBox, HorizontalBox } from "std-widgets.slint";
 
 export component AppWindow inherits Window {
     preferred-width: 800px;
     preferred-height: 480px;
 
     // Properties for C++ binding
-    in-out property <int> brightness: 80;
-    callback brightness-changed(int);
+    in-out property <float> brightness: 80;
+    callback brightness-changed(float);
     in property <[StandardListViewItem]> usb-files;
     in property <string> usb-status: "No USB Device";
     in property <string> temperature: "--.- °C";

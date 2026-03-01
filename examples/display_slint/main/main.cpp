@@ -47,7 +47,9 @@ static void sensor_init(void)
         .scl_io_num = BSP_EXT_I2C_SCL,
         .clk_source = I2C_CLK_SRC_DEFAULT,
         .glitch_ignore_cnt = 7,
-        .flags = { .enable_internal_pullup = true },
+        .intr_priority = 0,
+        .trans_queue_depth = 0,
+        .flags = { .enable_internal_pullup = true, .allow_pd = false },
     };
 
     if (i2c_new_master_bus(&bus_cfg, &s_ext_i2c) != ESP_OK) {
@@ -86,7 +88,8 @@ static void sensor_task(void *arg)
             temp_str = std::string(ok ? temp_buf : ""),
             hum_str = std::string(ok ? hum_buf : "")
         ]() {
-            if (auto ui = weak_ui_ptr->lock()) {
+            if (auto handle = weak_ui_ptr->lock()) {
+                auto &ui = *handle;
                 ui->set_sensor_connected(ok);
                 if (ok) {
                     ui->set_temperature(slint::SharedString(temp_str.c_str()));
@@ -132,7 +135,8 @@ static void usb_update(const slint::ComponentWeakHandle<AppWindow> &weak_ui)
         files = std::move(files),
         status_str
     ]() mutable {
-        if (auto ui = weak_ui.lock()) {
+        if (auto handle = weak_ui.lock()) {
+            auto &ui = *handle;
             auto model = std::make_shared<slint::VectorModel<slint::StandardListViewItem>>();
             for (auto &f : files) {
                 model->push_back(slint::StandardListViewItem{f});
@@ -188,6 +192,8 @@ extern "C" void app_main(void)
             static_cast<slint::platform::Rgb565Pixel *>(buf1), fb_size),
         .buffer2 = std::span<slint::platform::Rgb565Pixel>(
             static_cast<slint::platform::Rgb565Pixel *>(buf2), fb_size),
+        .rotation = slint::platform::SoftwareRenderer::RenderingRotation::NoRotation,
+        .byte_swap = false,
     };
     slint_esp_init(config);
 
@@ -198,7 +204,7 @@ extern "C" void app_main(void)
     ui->set_brightness(80);
     bsp_display_brightness_set(80);
 
-    auto weak_ui = ui->as_weak();
+    slint::ComponentWeakHandle<AppWindow> weak_ui(ui);
     s_usb_ui = weak_ui;
     bsp_usb_on_mount(on_usb_mount);
     bsp_usb_on_unmount(on_usb_unmount);

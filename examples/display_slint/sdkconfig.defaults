@@ -17,8 +17,11 @@ CONFIG_ESP32S3_DATA_CACHE_64KB=y
 CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
 CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
 
-# FreeRTOS — Slint needs 1ms tick and large stack
+# FreeRTOS — Slint needs 1ms tick
 CONFIG_FREERTOS_HZ=1000
+# Slint's SoftwareRenderer + TabWidget require ~100KB+ stack on the main task.
+# Smaller values (8KB, 32KB) cause stack overflow in render_buffer_impl.
+# 150KB matches the proven ptouch-ng configuration for this hardware.
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=150000
 
 # Compiler optimization

@@ -268,7 +268,9 @@ esp_err_t bsp_display_enter_sleep(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    bsp_display_lock(0);
+    if (!bsp_display_lock(0)) {
+        return ESP_ERR_TIMEOUT;
+    }
 
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_display);
     if (refr_timer) {
@@ -302,7 +304,9 @@ esp_err_t bsp_display_exit_sleep(void)
 
     BSP_ERROR_CHECK_RETURN_ERR(bsp_display_backlight_on());
 
-    bsp_display_lock(0);
+    if (!bsp_display_lock(0)) {
+        return ESP_ERR_TIMEOUT;
+    }
 
     lv_timer_t *refr_timer = lv_display_get_refr_timer(s_display);
     if (refr_timer) {

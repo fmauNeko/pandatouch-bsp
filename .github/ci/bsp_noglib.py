@@ -115,7 +115,7 @@ def update_examples(bsp_path):
                         str(bsp_path), example_dir.name
                     )
                 )
-        except Exception as e:
+        except (yaml.YAMLError, IOError, OSError) as e:
             print(
                 "{}: error parsing {}: {}".format(str(bsp_path), manifest_path, str(e))
             )
@@ -183,7 +183,7 @@ def bsp_no_glib_all(bsp_names):
         ret += add_notice_to_readme(bsp_path)
         try:
             check_bsp_readme(bsp_path)
-        except Exception as e:
+        except (ValueError, IOError, OSError) as e:
             # README.md was modified by the noglib generation, which is expected here
             print(f"[DEBUG] check_bsp_readme: {type(e).__name__}: {e}")
     return ret

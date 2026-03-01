@@ -24,8 +24,6 @@
 #include "esp_log.h"
 #include "driver/i2c_master.h"
 #include "bsp/esp-bsp.h"
-#include "bsp/display.h"
-#include "bsp/touch.h"
 #include "aht30.h"
 
 #include "ui.h"
@@ -166,8 +164,6 @@ extern "C" void app_main(void)
     esp_lcd_panel_io_handle_t io_handle = nullptr;
     ESP_ERROR_CHECK(bsp_display_new(nullptr, &panel_handle, &io_handle));
 
-    ESP_ERROR_CHECK(bsp_display_backlight_on());
-
     esp_lcd_touch_handle_t touch_handle = nullptr;
     ESP_ERROR_CHECK(bsp_touch_new(nullptr, &touch_handle));
 
@@ -196,10 +192,10 @@ extern "C" void app_main(void)
     usb_update(weak_ui);
 
     sensor_init();
-    slint::ComponentWeakHandle<AppWindow> *weak_ptr = nullptr;
+    static slint::ComponentWeakHandle<AppWindow> s_sensor_weak;
     if (s_sensor_ok) {
-        weak_ptr = new slint::ComponentWeakHandle<AppWindow>(weak_ui);
-        xTaskCreatePinnedToCore(sensor_task, "sensor", 4096, weak_ptr, 4, nullptr, 1);
+        s_sensor_weak = weak_ui;
+        xTaskCreatePinnedToCore(sensor_task, "sensor", 4096, &s_sensor_weak, 4, nullptr, 1);
     } else {
         ui->set_sensor_connected(false);
     }

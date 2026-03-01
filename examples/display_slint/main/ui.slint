@@ -37,7 +37,7 @@ export component AppWindow inherits Window {
                 }
 
                 Text {
-                    text: root.brightness + "%";
+                    text: round(root.brightness) + "%";
                     font-size: 16px;
                     horizontal-alignment: center;
                 }

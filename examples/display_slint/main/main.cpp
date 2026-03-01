@@ -195,7 +195,11 @@ extern "C" void app_main(void)
     static slint::ComponentWeakHandle<AppWindow> s_sensor_weak;
     if (s_sensor_ok) {
         s_sensor_weak = weak_ui;
-        xTaskCreatePinnedToCore(sensor_task, "sensor", 4096, &s_sensor_weak, 4, nullptr, 1);
+        BaseType_t rc = xTaskCreatePinnedToCore(sensor_task, "sensor", 4096, &s_sensor_weak, 4, nullptr, 1);
+        if (rc != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create sensor task");
+            ui->set_sensor_connected(false);
+        }
     } else {
         ui->set_sensor_connected(false);
     }

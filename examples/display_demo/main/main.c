@@ -284,18 +284,29 @@ static void sleep_test_task(void *arg)
     (void)arg;
 
     ESP_LOGI(TAG, "Entering display sleep for %d seconds", SLEEP_TEST_SECONDS);
-    ESP_ERROR_CHECK(bsp_display_enter_sleep());
+    esp_err_t err = bsp_display_enter_sleep();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "bsp_display_enter_sleep failed: %s", esp_err_to_name(err));
+        goto done;
+    }
 
     vTaskDelay(pdMS_TO_TICKS(SLEEP_TEST_SECONDS * 1000));
 
     ESP_LOGI(TAG, "Exiting display sleep");
-    ESP_ERROR_CHECK(bsp_display_exit_sleep());
+    err = bsp_display_exit_sleep();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "bsp_display_exit_sleep failed: %s", esp_err_to_name(err));
+    }
     bsp_display_brightness_set(80);
 
-    bsp_display_lock(0);
-    lv_label_set_text(s_sleep_label, "Awake!  Sleep test passed.");
-    lv_obj_remove_flag(s_sleep_btn, LV_OBJ_FLAG_HIDDEN);
-    bsp_display_unlock();
+done:
+    if (bsp_display_lock(0)) {
+        lv_label_set_text(s_sleep_label,
+                          err == ESP_OK ? "Awake!  Sleep test passed."
+                                       : "Sleep test failed!");
+        lv_obj_remove_flag(s_sleep_btn, LV_OBJ_FLAG_HIDDEN);
+        bsp_display_unlock();
+    }
 
     vTaskDelete(NULL);
 }
@@ -307,7 +318,12 @@ static void sleep_btn_cb(lv_event_t *e)
     lv_label_set_text(s_sleep_label,
                       LV_SYMBOL_EYE_CLOSE "  Sleeping for 3 s ...");
 
-    xTaskCreatePinnedToCore(sleep_test_task, "sleep_test", 4096, NULL, 3, NULL, 0);
+    BaseType_t rc = xTaskCreatePinnedToCore(sleep_test_task, "sleep_test", 4096, NULL, 3, NULL, 0);
+    if (rc != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create sleep_test task");
+        lv_label_set_text(s_sleep_label, "Sleep unavailable");
+        lv_obj_remove_flag(s_sleep_btn, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

@@ -11,4 +11,5 @@ The documentation for the main `pandatouch` component can be found in the [panda
 - [display_hello](examples/display_hello): Simple "Hello World" example.
 - [display_demo](examples/display_demo): Comprehensive demo showing backlight, USB, and sensors.
 - [display_noglib](examples/display_noglib): Raw panel access without LVGL.
+- [display_slint](examples/display_slint): Slint (C++) UI replicating display_demo without LVGL.
 

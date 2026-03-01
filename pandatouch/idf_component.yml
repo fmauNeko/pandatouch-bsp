@@ -1,4 +1,4 @@
-version: 0.3.1
+version: 0.4.0
 description: Board Support Package for BigTreeTech Panda Touch (ESP32-S3)
 url: https://github.com/fmauNeko/pandatouch-bsp
 license: MIT

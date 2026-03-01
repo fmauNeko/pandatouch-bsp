@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/fmauNeko/pandatouch-bsp/compare/v0.3.1...v0.4.0) (2026-03-01)
+
+
+### Features
+
+* **display:** fill screen black and pause rendering on display sleep ([c695418](https://github.com/fmauNeko/pandatouch-bsp/commit/c695418a6916b38d3d5af39a79ef9b68ef4f8290))
+
+
+### Bug Fixes
+
+* address code review findings across BSP and display_slint ([30d9a42](https://github.com/fmauNeko/pandatouch-bsp/commit/30d9a42e1e64a7dadfad8860b4a08cfca74987d0))
+* **display:** harden sleep/wake with race guard, null checks, and error handling ([5d54948](https://github.com/fmauNeko/pandatouch-bsp/commit/5d549486b0ba06ef33d4eed5268c2df8af7b5753))
+
 ## [0.3.1](https://github.com/fmauNeko/pandatouch-bsp/compare/v0.3.0...v0.3.1) (2026-02-27)
 
 

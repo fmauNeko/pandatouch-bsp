@@ -29,7 +29,7 @@ menu "Board Support Package (Panda Touch)"
     menu "Display"
         config BSP_DISPLAY_BRIGHTNESS_LEDC_CH
             int "LEDC channel index for backlight"
-            default 1
+            default 0
             range 0 7
             help
                 LEDC channel is used to generate PWM signal that controls display brightness.

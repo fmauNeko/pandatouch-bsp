@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/fmauNeko/pandatouch-bsp/compare/v0.4.0...v0.4.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* correct component dependency declarations and default LEDC channel ([083194d](https://github.com/fmauNeko/pandatouch-bsp/commit/083194dcecc1b2025b487c8ce742add06a4fd329))
+
 ## [0.4.0](https://github.com/fmauNeko/pandatouch-bsp/compare/v0.3.1...v0.4.0) (2026-03-01)
 
 

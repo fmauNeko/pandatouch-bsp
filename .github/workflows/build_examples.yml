@@ -1,7 +1,8 @@
 name: Build examples
 
 # Compiles all BSP examples on every change to BSP sources, examples, or CI scripts.
-# Order matters: display_hello and display_demo must build before bsp_noglib.py renames pandatouch/ → pandatouch_noglib/.
+# LVGL examples build in parallel via matrix; the no-LVGL variant runs in a separate
+# parallel job because it must generate pandatouch_noglib/ first.
 
 on:
   push:
@@ -22,8 +23,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── LVGL examples (parallel matrix) ──────────────────────────────────────
   build:
-    name: Build (IDF ${{ matrix.idf_ver }})
+    name: Build ${{ matrix.example }} (IDF ${{ matrix.idf_ver }})
     runs-on: ubuntu-latest
     container: espressif/idf:${{ matrix.idf_ver }}
 
@@ -32,41 +34,93 @@ jobs:
       matrix:
         idf_ver:
           - "release-v6.0"
+        example:
+          - display_hello
+          - display_demo
+          - display_lvgl_benchmark
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install upstream ccache
+        run: |
+          curl -fsSL https://github.com/ccache/ccache/releases/download/v4.12.3/ccache-4.12.3-linux-x86_64.tar.xz \
+            | tar -xJ --strip-components=1 -C /usr/local/bin ccache-4.12.3-linux-x86_64/ccache
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-ccache-${{ matrix.idf_ver }}-${{ matrix.example }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.idf_ver }}-${{ matrix.example }}-
+            ${{ runner.os }}-ccache-${{ matrix.idf_ver }}-
+
+      - name: Cache managed components
+        uses: actions/cache@v4
+        with:
+          path: |
+            examples/${{ matrix.example }}/managed_components
+            examples/${{ matrix.example }}/dependencies.lock
+          key: ${{ runner.os }}-components-${{ matrix.idf_ver }}-${{ matrix.example }}-${{ hashFiles('**/idf_component.yml') }}
+
+      - name: Build ${{ matrix.example }}
+        shell: bash
+        run: |
+          . ${IDF_PATH}/export.sh
+          cd examples/${{ matrix.example }}
+          idf.py build
+
+      - name: Print ccache statistics
+        if: always()
+        run: ccache -sv
+
+  # ── No-LVGL example (needs pandatouch_noglib generation) ─────────────────
+  build-noglib:
+    name: Build ${{ matrix.example }} (IDF ${{ matrix.idf_ver }})
+    runs-on: ubuntu-latest
+    container: espressif/idf:${{ matrix.idf_ver }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        idf_ver:
+          - "release-v6.0"
+        example:
+          - display_noglib
+          - display_slint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install upstream ccache
+        run: |
+          curl -fsSL https://github.com/ccache/ccache/releases/download/v4.12.3/ccache-4.12.3-linux-x86_64.tar.xz \
+            | tar -xJ --strip-components=1 -C /usr/local/bin ccache-4.12.3-linux-x86_64/ccache
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ${{ runner.os }}-ccache-${{ matrix.idf_ver }}-${{ matrix.example }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.idf_ver }}-${{ matrix.example }}-
+            ${{ runner.os }}-ccache-${{ matrix.idf_ver }}-
+
+      - name: Cache managed components
+        uses: actions/cache@v4
+        with:
+          path: |
+            examples/${{ matrix.example }}/managed_components
+            examples/${{ matrix.example }}/dependencies.lock
+          key: ${{ runner.os }}-components-${{ matrix.idf_ver }}-${{ matrix.example }}-${{ hashFiles('**/idf_component.yml') }}
 
       - name: Install Python CI dependencies
         shell: bash
         run: |
           . ${IDF_PATH}/export.sh
-          pip install "idf-component-manager>=2,<3" py-markdown-table --upgrade
+          pip install py-markdown-table --upgrade
 
-      # ── 1. Build the LVGL example (pandatouch/ must still exist) ──────────
-      - name: Build display_hello
-        shell: bash
-        run: |
-          . ${IDF_PATH}/export.sh
-          cd examples/display_hello
-          idf.py build
-
-      # ── 2. Build the comprehensive demo example (pandatouch/ must still exist) ──
-      - name: Build display_demo
-        shell: bash
-        run: |
-          . ${IDF_PATH}/export.sh
-          cd examples/display_demo
-          idf.py build
-
-      # ── 3. Build the LVGL benchmark example (pandatouch/ must still exist) ────
-      - name: Build display_lvgl_benchmark
-        shell: bash
-        run: |
-          . ${IDF_PATH}/export.sh
-          cd examples/display_lvgl_benchmark
-          idf.py build
-
-      # ── 4. Generate pandatouch_noglib (renames pandatouch/ → pandatouch_noglib/) ──
       - name: Generate pandatouch_noglib
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -74,10 +128,13 @@ jobs:
           . ${IDF_PATH}/export.sh
           python .github/ci/bsp_noglib.py pandatouch
 
-      # ── 5. Build the no-LVGL example (pandatouch_noglib/ now exists) ───────
-      - name: Build display_noglib
+      - name: Build ${{ matrix.example }}
         shell: bash
         run: |
           . ${IDF_PATH}/export.sh
-          cd examples/display_noglib
+          cd examples/${{ matrix.example }}
           idf.py build
+
+      - name: Print ccache statistics
+        if: always()
+        run: ccache -sv
